@@ -11,6 +11,9 @@ before_install:
 
 script: |
   sudo -E env "PATH=$PATH" go test ./... -v -race
+  sudo rm -rf /etc/ppp/options
+  sudo cp ./testdata/pppsvrconf/* /etc/ppp/
+
 
 
 
