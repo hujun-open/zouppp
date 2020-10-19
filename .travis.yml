@@ -8,11 +8,12 @@ go:
 before_install:
   - sudo apt-get -y install libpcap-dev pppoe
   - go get -t -v ./...
+  - sudo rm -rf /etc/ppp/options
+  - sudo cp ./testdata/pppsvrconf/* /etc/ppp/
 
 script: |
   sudo -E env "PATH=$PATH" go test ./... -v -race
-  sudo rm -rf /etc/ppp/options
-  sudo cp ./testdata/pppsvrconf/* /etc/ppp/
+
 
 
 
