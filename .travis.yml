@@ -1,0 +1,16 @@
+language: go
+dist: bionic
+sudo: required
+
+go:
+  - 1.14.x
+
+before_install:
+  - sudo apt-get -y install pppoe
+  - go get -t -v ./...
+
+script: |
+  sudo -E env "PATH=$PATH" go test ./... -v -race
+
+
+
