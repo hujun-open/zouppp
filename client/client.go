@@ -93,9 +93,13 @@ func NewZouPPP(econn *etherconn.EtherConn, cfg *Config,
 	zou = new(ZouPPP)
 	zou.cfg = cfg
 	zou.logger = cfg.setup.Logger.Named(econn.LocalAddr().String())
+	taglist := []pppoe.Tag{pppoe.NewSvcTag("")}
+	if cfg.CID != "" || cfg.RID != "" {
+		taglist = append(taglist, pppoe.NewCircuitRemoteIDTag(cfg.CID, cfg.RID))
+	}
 	zou.pppoeProto = pppoe.NewPPPoE(econn,
 		zou.logger,
-		pppoe.WithTags([]pppoe.Tag{pppoe.NewCircuitRemoteIDTag(cfg.CID, cfg.RID), pppoe.NewSvcTag("")}))
+		pppoe.WithTags(taglist))
 	if err != nil {
 		return nil, err
 	}

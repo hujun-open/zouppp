@@ -57,7 +57,6 @@ func newSetupviaFlags(
 	VLANStep uint,
 	excludevlanid string,
 	Interval time.Duration,
-	// Debug bool,
 	logl uint,
 	rid, cid string,
 	uname, passwd string,
@@ -168,8 +167,7 @@ func newSetupviaFlags(
 
 func main() {
 	ifname := flag.String("i", "", "interface name")
-	// debug := flag.Bool("d", false, "enable debug output")
-	loglvl := flag.Uint("l", uint(client.LogLvlErr), "log level")
+	loglvl := flag.Uint("l", uint(client.LogLvlErr), fmt.Sprintf("log level: %d,%d,%d", client.LogLvlErr, client.LogLvlInfo, client.LogLvlDebug))
 	mac := flag.String("mac", "", "mac address")
 	macstep := flag.Uint("macstep", 1, "mac address step")
 	vlanstep := flag.Uint("vlanstep", 0, "VLAN Id step")
@@ -177,8 +175,8 @@ func main() {
 	uname := flag.String("u", "", "user name")
 	passwd := flag.String("p", "", "password")
 	usepap := flag.Bool("pap", false, "use PAP instead of CHAP")
-	cid := flag.String("cid", "", "pppoe tag circuit-id")
-	rid := flag.String("rid", "", "pppoe tag remote-id")
+	cid := flag.String("cid", "", "pppoe BBF tag circuit-id")
+	rid := flag.String("rid", "", "pppoe BBF tag remote-id")
 	ipv4 := flag.Bool("v4", true, "enable Ipv4")
 	ipv6 := flag.Bool("v6", true, "enable Ipv6")
 	vlanid := flag.Int("vlan", -1, "vlan tag")
@@ -191,7 +189,7 @@ func main() {
 	timeout := flag.Duration("timeout", 5*time.Second, "timeout")
 	interval := flag.Duration("interval", time.Millisecond, "interval between launching client")
 	pppifname := flag.String("pppif", client.DefaultPPPIfNameTemplate, fmt.Sprintf("ppp interface name, must contain %v", client.VarName))
-	apply := flag.Bool("a", false, "apply the network config")
+	apply := flag.Bool("a", false, "apply the network config, set false to skip creating the PPP TUN if")
 	flag.Parse()
 	rootlog, err := client.NewDefaultZouPPPLogger(client.LoggingLvl(*loglvl))
 	if err != nil {
