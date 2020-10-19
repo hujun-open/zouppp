@@ -6,7 +6,7 @@ go:
   - 1.14.x
 
 before_install:
-  - sudo apt-get -y install pppoe
+  - sudo apt-get -y install libpcap-dev pppoe
   - go get -t -v ./...
 
 script: |
