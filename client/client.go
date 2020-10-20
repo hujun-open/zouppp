@@ -10,11 +10,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"zouppp/chap"
-	"zouppp/datapath"
-	"zouppp/lcp"
-	"zouppp/pap"
-	"zouppp/pppoe"
+
+	"github.com/hujun-open/zouppp/chap"
+	"github.com/hujun-open/zouppp/datapath"
+	"github.com/hujun-open/zouppp/lcp"
+	"github.com/hujun-open/zouppp/pap"
+	"github.com/hujun-open/zouppp/pppoe"
 
 	"github.com/hujun-open/etherconn"
 	"github.com/hujun-open/myaddr"

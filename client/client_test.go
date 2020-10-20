@@ -15,8 +15,9 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"zouppp/lcp"
-	"zouppp/pppoe"
+
+	"github.com/hujun-open/zouppp/lcp"
+	"github.com/hujun-open/zouppp/pppoe"
 
 	"github.com/hujun-open/etherconn"
 )

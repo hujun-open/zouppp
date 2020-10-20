@@ -5,7 +5,8 @@ import (
 	"crypto/md5"
 	"fmt"
 	"time"
-	"zouppp/lcp"
+
+	"github.com/hujun-open/zouppp/lcp"
 
 	"go.uber.org/zap"
 )

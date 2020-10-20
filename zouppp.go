@@ -32,12 +32,11 @@ import (
 	_ "net/http/pprof"
 	"runtime"
 	"time"
-	"zouppp/client"
-	"zouppp/pppoe"
-
-	"zouppp/lcp"
 
 	"github.com/hujun-open/etherconn"
+	"github.com/hujun-open/zouppp/client"
+	"github.com/hujun-open/zouppp/lcp"
+	"github.com/hujun-open/zouppp/pppoe"
 	"go.uber.org/zap"
 )
 

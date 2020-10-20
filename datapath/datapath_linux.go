@@ -8,7 +8,8 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"zouppp/lcp"
+
+	"github.com/hujun-open/zouppp/lcp"
 
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
