@@ -124,9 +124,24 @@ func (pppoe *PPPoE) LocalAddr() net.Addr {
 	return newPPPoEEndpoint(pppoe.conn.LocalAddr(), pppoe.sessionID)
 }
 
-// Close implements net.PacketConn interface, does nothing and always return nil
+// Close implements net.PacketConn interface
 func (pppoe *PPPoE) Close() error {
+	if atomic.LoadUint32(pppoe.state) == pppoeStateOpen {
+		pkt := pppoe.buildPADT()
+		pktbytes, err := pkt.Serialize()
+		if err != nil {
+			return err
+		}
+		pppoe.conn.WritePktTo(pktbytes, EtherTypePPPoEDiscovery, pppoe.acMAC)
+	}
 	return nil
+}
+
+func (pppoe *PPPoE) buildPADT() *Pkt {
+	return &Pkt{
+		Code:      CodePADT,
+		SessionID: pppoe.sessionID,
+	}
 }
 
 func (pppoe *PPPoE) buildPADI() *Pkt {

@@ -187,6 +187,12 @@ func (zou *ZouPPP) Dial(ctx context.Context) {
 	return
 }
 
+// Close shutdown the client
+func (zou *ZouPPP) Close() {
+	zou.pppoeProto.Close()
+	zou.cancelMe()
+}
+
 func (zou *ZouPPP) cancelMe() {
 	s := atomic.LoadUint32(zou.state)
 	zou.logger.Sugar().Debugf("zouppp stopped at state %v", stateStr(s))

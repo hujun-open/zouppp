@@ -22,9 +22,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"flag"
 	"log"
@@ -255,6 +258,7 @@ func main() {
 	// sessionwg.Wait to wait for all opened sessions
 	sessionwg := new(sync.WaitGroup)
 	// start dialing
+	var clntList []*client.ZouPPP
 	for _, cfg := range cfglist {
 		econn := etherconn.NewEtherConn(cfg.Mac, relay,
 			etherconn.WithVLANs(cfg.VLANs), etherconn.WithRecvMulticast(true))
@@ -264,6 +268,7 @@ func main() {
 			return
 		}
 		go z.Dial(ctx)
+		clntList = append(clntList, z)
 		// sleep for dialing interval
 		time.Sleep(setup.Interval)
 	}
@@ -274,9 +279,20 @@ func main() {
 	summary := <-summaryCh
 	fmt.Println(summary)
 	close(setup.StopResultCh)
+	// handle ctrl+c
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("stopping...")
+		for _, z := range clntList {
+			z.Close()
+		}
+	}()
 	// wait for all opened sessions to close
 	if summary.Success > 0 {
 		sessionwg.Wait()
 	}
+	fmt.Println("done")
 
 }
