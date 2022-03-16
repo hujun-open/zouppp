@@ -80,7 +80,7 @@ func testRunSvr(ctx context.Context, cfg string) error {
 		return err
 	}
 	tmpf.Close()
-	cmd := fmt.Sprintf("netns exec %v pppoe-server -I %v -F -O %v", svrNS, svrIF, tmpf.Name())
+	cmd := fmt.Sprintf("netns exec %v pppoe-server -q /usr/sbin/pppd -I %v -F -O %v", svrNS, svrIF, tmpf.Name())
 	if err := exec.CommandContext(ctx, "ip", strings.Fields(cmd)...).Start(); err != nil {
 		return err
 	}

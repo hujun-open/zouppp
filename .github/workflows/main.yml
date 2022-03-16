@@ -38,3 +38,5 @@ jobs:
 
       - name: Test
         run: sudo -E env "PATH=$PATH" go test -failfast -p 1 -v ./...
+      - name: Show syslog
+        run: cat /var/log/syslog
