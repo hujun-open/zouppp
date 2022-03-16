@@ -53,17 +53,18 @@ It has following key features:
 
 `zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -rid remote-id-@id`
 
+8. #1 variant, use XDP socket;
 
+`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -xdp`
 
 ### CLI
 
 ```
-~/gowork/src/zouppp# ./zouppp -?
 flag provided but not defined: -?
 Usage of ./zouppp:
-  -a    apply the network config
+  -a    apply the network config, set false to skip creating the PPP TUN if
   -cid string
-        pppoe tag circuit-id
+        pppoe BBF tag circuit-id
   -excludedvlans string
         excluded vlan IDs
   -i string
@@ -71,7 +72,7 @@ Usage of ./zouppp:
   -interval duration
         interval between launching client (default 1ms)
   -l uint
-        log level
+        log level: 0,1,2
   -mac string
         mac address
   -macstep uint
@@ -89,7 +90,7 @@ Usage of ./zouppp:
   -retry uint
         number of retry (default 3)
   -rid string
-        pppoe tag remote-id
+        pppoe BBF tag remote-id
   -svlan int
         svlan tag (default -1)
   -svlanetype uint
@@ -108,6 +109,8 @@ Usage of ./zouppp:
         vlan tag EtherType (default 33024)
   -vlanstep uint
         VLAN Id step
+  -xdp
+        use XDP
 ```
 
 

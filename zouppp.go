@@ -191,6 +191,7 @@ func main() {
 	timeout := flag.Duration("timeout", 5*time.Second, "timeout")
 	interval := flag.Duration("interval", time.Millisecond, "interval between launching client")
 	pppifname := flag.String("pppif", client.DefaultPPPIfNameTemplate, fmt.Sprintf("ppp interface name, must contain %v", client.VarName))
+	usexdp := flag.Bool("xdp", false, "use XDP")
 	apply := flag.Bool("a", false, "apply the network config, set false to skip creating the PPP TUN if")
 	flag.Parse()
 	rootlog, err := client.NewDefaultZouPPPLogger(client.LoggingLvl(*loglvl))
@@ -242,12 +243,28 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// create a etherconn.RawSoketRelay
-	relay, err := etherconn.NewRawSocketRelay(ctx, setup.Ifname,
-		etherconn.WithEtherType([]uint16{pppoe.EtherTypePPPoEDiscovery, pppoe.EtherTypePPPoESession}),
-		etherconn.WithDebug(setup.LogLevel == client.LogLvlDebug), etherconn.WithRecvTimeout(setup.Timeout))
-	if err != nil {
-		rootlog.Sugar().Errorf("failed to create packet relay, %v", err)
-		return
+	var relay etherconn.PacketRelay
+	if !*usexdp {
+		relay, err = etherconn.NewRawSocketRelay(ctx, setup.Ifname,
+			etherconn.WithDebug(setup.LogLevel == client.LogLvlDebug),
+			etherconn.WithBPFFilter(`(ether proto 0x8863 or 0x8864) or (vlan and ether proto 0x8863 or 0x8864)`),
+			etherconn.WithRecvTimeout(setup.Timeout))
+		if err != nil {
+			rootlog.Sugar().Errorf("failed to create raw packet relay, %v", err)
+			return
+		}
+	} else {
+		relay, err = etherconn.NewXDPRelay(ctx, setup.Ifname,
+			etherconn.WithXDPDebug(setup.LogLevel == client.LogLvlDebug),
+			etherconn.WithXDPEtherTypes([]uint16{0x8863, 0x8864}),
+			etherconn.WithXDPDefaultReceival(false),
+			etherconn.WithXDPSendChanDepth(10240),
+			etherconn.WithXDPUMEMNumOfTrunk(65536),
+		)
+		if err != nil {
+			rootlog.Sugar().Errorf("failed to create xdp packet relay, %v", err)
+			return
+		}
 	}
 	// create a ResultSummary channel to get a ResultSummary upon dial finishes
 	summaryCh := make(chan *client.ResultSummary)
@@ -261,6 +278,7 @@ func main() {
 	var clntList []*client.ZouPPP
 	for _, cfg := range cfglist {
 		econn := etherconn.NewEtherConn(cfg.Mac, relay,
+			etherconn.WithEtherTypes([]uint16{pppoe.EtherTypePPPoEDiscovery, pppoe.EtherTypePPPoESession}),
 			etherconn.WithVLANs(cfg.VLANs), etherconn.WithRecvMulticast(true))
 		z, err := client.NewZouPPP(econn, cfg, client.WithDialWG(dialwg), client.WithSessionWG(sessionwg))
 		if err != nil {

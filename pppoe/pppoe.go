@@ -18,7 +18,6 @@ import (
 
 // PPPoE is the PPPoE protocol
 type PPPoE struct {
-	ifName      string
 	serviceName string
 	sessionID   uint16
 	tags        []Tag
@@ -252,7 +251,7 @@ func (pppoe *PPPoE) getResponse(req *Pkt, code Code, dst net.HardwareAddr) (*Pkt
 		if err != nil {
 			if !errors.Is(err, etherconn.ErrTimeOut) {
 				return nil, nil, fmt.Errorf("failed to recv response, %w", err)
-			}
+			} //else timeout
 		}
 		err = resp.Parse(rcvpktbuf)
 		if err != nil {

@@ -82,7 +82,6 @@ type ZouPPP struct {
 	sessionWG         *sync.WaitGroup
 	cancelFunc        context.CancelFunc
 	state             *uint32
-	pastDial          bool
 	dialSucceed       bool
 	result            *DialResult
 }
@@ -184,7 +183,6 @@ func (zou *ZouPPP) Dial(ctx context.Context) {
 	}
 	zou.lcpProto.Up(childctx)
 	needTOTerminate = false
-	return
 }
 
 // Close shutdown the client

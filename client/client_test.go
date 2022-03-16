@@ -30,24 +30,6 @@ const (
 	uPass  = "passwd123"
 )
 
-const testKillScript = `#!/usr/bin/env bash
-
-if [[ $# -lt 1 ]]; then
-  echo "missing program name"
-  exit
-fi
-
-pids=` + "`" + `ps h -C $1 -o pid` + "`" + `
-if [[ -z $pids ]]; then
-  echo "can't find process $1"
-  exit
-fi
-while IFS= read -r pid; do
-    echo "killing $pid ..."
-    kill $pid
-done <<< "$pids"
-`
-
 func execCMD(cmdstr string) error {
 	// fmt.Printf("executing cmd %v\n", cmdstr)
 	clist := strings.Fields(cmdstr)
@@ -62,15 +44,15 @@ type testCMD struct {
 
 func testCreateVethLink() error {
 	cmdList := []testCMD{
-		testCMD{cmd: fmt.Sprintf("ip netns del %v", svrNS), ignoreFail: true},
-		testCMD{cmd: fmt.Sprintf("ip link del %v", clntIF), ignoreFail: true},
-		testCMD{cmd: fmt.Sprintf("ip netns add %v", svrNS)},
-		testCMD{cmd: fmt.Sprintf("ip link add %v type veth peer name %v", svrIF, clntIF)},
-		testCMD{cmd: fmt.Sprintf("ip link set %v netns %v", svrIF, svrNS)},
-		testCMD{cmd: fmt.Sprintf("ip netns exec %v ip link set %v up", svrNS, svrIF)},
-		testCMD{cmd: "ip netns exec S ip link set lo up"},
-		testCMD{cmd: "ip netns exec S ip addr replace 127.0.0.1/32 dev lo"},
-		testCMD{cmd: fmt.Sprintf("ip link set %v up", clntIF)},
+		{cmd: fmt.Sprintf("ip netns del %v", svrNS), ignoreFail: true},
+		{cmd: fmt.Sprintf("ip link del %v", clntIF), ignoreFail: true},
+		{cmd: fmt.Sprintf("ip netns add %v", svrNS)},
+		{cmd: fmt.Sprintf("ip link add %v type veth peer name %v", svrIF, clntIF)},
+		{cmd: fmt.Sprintf("ip link set %v netns %v", svrIF, svrNS)},
+		{cmd: fmt.Sprintf("ip netns exec %v ip link set %v up", svrNS, svrIF)},
+		{cmd: "ip netns exec S ip link set lo up"},
+		{cmd: "ip netns exec S ip addr replace 127.0.0.1/32 dev lo"},
+		{cmd: fmt.Sprintf("ip link set %v up", clntIF)},
 	}
 	for _, c := range cmdList {
 		err := execCMD(c.cmd)
@@ -86,17 +68,9 @@ func testCreateVethLink() error {
 const dontRunTestSvr = "no server"
 
 func testRunSvr(ctx context.Context, cfg string) error {
-	tmpkillf, err := ioutil.TempFile("", "killbyname")
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(tmpkillf.Name(), []byte(testKillScript), 0750)
-	if err != nil {
-		return err
-	}
-	os.Chmod(tmpkillf.Name(), 0750)
-	tmpkillf.Close()
-	execCMD(fmt.Sprintf("%v pppoe-server", tmpkillf.Name()))
+	execCMD("pkill -9 pppoe-server")
+	execCMD("pkill -9 pppoe")
+	time.Sleep(time.Second)
 	tmpf, err := ioutil.TempFile("", "pppoesvroptions_*")
 	if err != nil {
 		return err
@@ -144,7 +118,8 @@ func TestPPPoE(t *testing.T) {
 	}
 
 	caseList := []testCase{
-		testCase{
+		//case 0
+		{
 			desc: "pap v4 only",
 			svrConfig: `
 			name mysystem
@@ -159,15 +134,15 @@ func TestPPPoE(t *testing.T) {
 				PPPIfName: "testppp0",
 				setup: &Setup{
 					Logger:    rootlog,
-					Timeout:   3 * time.Second,
+					Timeout:   10 * time.Second,
 					AuthProto: lcp.ProtoPAP,
 					IPv4:      true,
 					IPv6:      false,
 				},
 			},
 		},
-
-		testCase{
+		//case 1
+		{
 			desc: "chap v4 only",
 			svrConfig: `
 			name mysystem
@@ -189,8 +164,8 @@ func TestPPPoE(t *testing.T) {
 				},
 			},
 		},
-
-		testCase{
+		//case 2
+		{
 			desc: "pap v6 only",
 			svrConfig: `
 			name mysystem
@@ -215,8 +190,8 @@ func TestPPPoE(t *testing.T) {
 				},
 			},
 		},
-
-		testCase{
+		//case 3
+		{
 			desc: "chap v6 only",
 			svrConfig: `
 			name mysystem
@@ -241,8 +216,8 @@ func TestPPPoE(t *testing.T) {
 				},
 			},
 		},
-
-		testCase{
+		//case 4
+		{
 			desc: "chap dualstack",
 			svrConfig: `
 			name mysystem
@@ -266,8 +241,8 @@ func TestPPPoE(t *testing.T) {
 				},
 			},
 		},
-
-		testCase{
+		//case 5
+		{
 			desc: "pap dualstack",
 			svrConfig: `
 			name mysystem
@@ -291,8 +266,8 @@ func TestPPPoE(t *testing.T) {
 				},
 			},
 		},
-
-		testCase{
+		//case 6
+		{
 			desc: "pap v4 only, wrong passwd, should fail",
 			svrConfig: `
 			name mysystem
@@ -316,8 +291,8 @@ func TestPPPoE(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		testCase{
+		//case 7
+		{
 			desc: "chap v4 only, wrong passwd, should fail",
 			svrConfig: `
 			name mysystem
@@ -341,8 +316,8 @@ func TestPPPoE(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		testCase{
+		//case 8
+		{
 			desc:      "no pppoesvr, should fail",
 			svrConfig: dontRunTestSvr,
 			zouconfig: &Config{
@@ -362,8 +337,8 @@ func TestPPPoE(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		testCase{
+		//case 9
+		{
 			desc: "no auth configured on svr side, should fail",
 			svrConfig: `
 			name mysystem
@@ -386,8 +361,8 @@ func TestPPPoE(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		testCase{
+		//case 10
+		{
 			desc: "pap on client while chap on svr, should fail",
 			svrConfig: `
 			name mysystem
@@ -411,8 +386,8 @@ func TestPPPoE(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		testCase{
+		//case 11
+		{
 			desc: "chap on client while pap on svr, should fail",
 			svrConfig: `
 			name mysystem
@@ -436,8 +411,8 @@ func TestPPPoE(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		testCase{
+		//case 12
+		{
 			desc: "chap, client requires dualstack, but svr only configures with v4, should fail",
 			svrConfig: `
 			name mysystem
@@ -462,8 +437,8 @@ func TestPPPoE(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		testCase{
+		//case 13
+		{
 			desc: "chap, client requires dualstack, but svr only configures with v6, should fail",
 			svrConfig: `
 			name mysystem
@@ -490,7 +465,7 @@ func TestPPPoE(t *testing.T) {
 		},
 	}
 
-	testFunc := func(c testCase, t *testing.T) error {
+	testFunc := func(c testCase, t *testing.T, usingxdp bool) error {
 		resultch := make(chan *DialResult)
 		stopch := make(chan struct{})
 		c.zouconfig.setup.ResultCh = resultch
@@ -504,31 +479,58 @@ func TestPPPoE(t *testing.T) {
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		relay, err := etherconn.NewRawSocketRelay(ctx, clntIF,
-			etherconn.WithEtherType([]uint16{pppoe.EtherTypePPPoEDiscovery, pppoe.EtherTypePPPoESession}),
-			etherconn.WithDebug(true), etherconn.WithRecvTimeout(3*time.Second))
+		var relay etherconn.PacketRelay
+		if !usingxdp {
+			relay, err = etherconn.NewRawSocketRelay(ctx, clntIF,
+				etherconn.WithDebug(true),
+				etherconn.WithRecvTimeout(c.zouconfig.setup.Timeout),
+				etherconn.WithBPFFilter(`(ether proto 0x8863 or 0x8864) or (vlan and ether proto 0x8863 or 0x8864)`),
+			)
+		} else {
+			relay, err = etherconn.NewXDPRelay(ctx, clntIF,
+				// etherconn.WithQueueID([]int{0}),
+				etherconn.WithXDPDebug(true),
+				etherconn.WithXDPEtherTypes([]uint16{0x8863, 0x8864}),
+				etherconn.WithXDPDefaultReceival(false),
+			)
+
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer relay.Stop()
 		dialwg := new(sync.WaitGroup)
 		dialwg.Add(1)
 		econn := etherconn.NewEtherConn(c.zouconfig.Mac, relay,
 			etherconn.WithVLANs(c.zouconfig.VLANs),
+			etherconn.WithEtherTypes([]uint16{pppoe.EtherTypePPPoEDiscovery, pppoe.EtherTypePPPoESession}),
 			etherconn.WithRecvMulticast(true))
+		// err = execCMD("ip netns exec S ip link set S xdp object xdpethfilter_kern.o section xdp_pass_sec")
+		if err != nil {
+			t.Fatal(err)
+		}
 		if c.svrConfig != dontRunTestSvr {
 			err = testRunSvr(ctx, c.svrConfig)
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer func() {
+				execCMD("pkill -9 pppoe-server")
+				execCMD("pkill -9 pppoe")
+				time.Sleep(3 * time.Second)
+			}()
 		}
 		z, err := NewZouPPP(econn, c.zouconfig, WithDialWG(dialwg))
 		if err != nil {
 			return err
 		}
+		go execCMD("ip netns exec S tcpdump -n -i S -w s.pcap")
 		go z.Dial(ctx)
 		dialwg.Wait()
 		summary := <-summaryCh
 		close(c.zouconfig.setup.StopResultCh)
+		// ch := make(chan int)
+		// <-ch
 
 		if summary.Success != 1 {
 			return fmt.Errorf("failed")
@@ -548,8 +550,22 @@ func TestPPPoE(t *testing.T) {
 		// if i != 1 {
 		// 	continue
 		// }
-		t.Logf("-----> start case %d: %v", i, c.desc)
-		err := testFunc(c, t)
+		t.Logf("-----> start case %d using rawrelay: %v", i, c.desc)
+		err := testFunc(c, t, false)
+		if err != nil {
+			if c.shouldFail {
+				t.Logf("case %d: %v, failed as expected", i, c.desc)
+			} else {
+				t.Fatalf("case %d: %v failed, %v", i, c.desc, err)
+			}
+		} else {
+			if c.shouldFail {
+				t.Fatalf("case %d: %v should failed but succeed", i, c.desc)
+			}
+		}
+		//using xdp
+		t.Logf("-----> start case %d using xdprelay: %v", i, c.desc)
+		err = testFunc(c, t, true)
 		if err != nil {
 			if c.shouldFail {
 				t.Logf("case %d: %v, failed as expected", i, c.desc)
