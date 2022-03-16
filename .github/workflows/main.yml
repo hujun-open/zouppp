@@ -37,8 +37,10 @@ jobs:
         run: sudo apt-get -y install libpcap-dev ppp pppoe
       - name: download go dep
         run: go get -t -v ./...
-
-
+      - name: remove stock pppd options file
+        run: sudo rm -rf /etc/ppp/options
+      - name: copy test pppd files
+        run: sudo cp ./testdata/pppsvrconf/* /etc/ppp/        
       - name: Test
         run: sudo -E env "PATH=$PATH" go test -failfast -p 1 -v ./...
       - name: Debugging with tmate
