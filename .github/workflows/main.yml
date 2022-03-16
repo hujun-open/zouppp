@@ -31,7 +31,7 @@ jobs:
         with:
           go-version: 1.17
       - name: install dep
-        run: sudo apt-get -y install libpcap-dev pppoe
+        run: sudo apt-get -y install libpcap-dev ppp rp-pppoe
       - name: download go dep
         run: go get -t -v ./...
 
