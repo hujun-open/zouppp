@@ -27,10 +27,8 @@ jobs:
 
       # Runs a single command using the runners shell
 
-      - name: Debugging with tmate
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3.11
-        
+
+
       - name: setup up GO
         uses: actions/setup-go@v2
         with:
@@ -43,7 +41,9 @@ jobs:
 
       - name: Test
         run: sudo -E env "PATH=$PATH" go test -failfast -p 1 -v ./...
-      - name: Show syslog
-        run: cat /var/log/syslog
+      - name: Debugging with tmate
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3.11
+
 
 
