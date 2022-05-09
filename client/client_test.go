@@ -1,5 +1,11 @@
 package client
 
+/*
+in order to run this test in ubuntu20.04, do following:
+  - apt-get install ppp pppoe
+  - sudo rm -rf /etc/ppp/options
+  - sudo cp ./testdata/pppsvrconf/* /etc/ppp/
+*/
 import (
 	"context"
 	"fmt"

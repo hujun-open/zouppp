@@ -134,7 +134,6 @@ func (own *DefaultIPCPOwnRule) HandlerConfRej(rcvd Options) {
 			own.SecondaryNBNS = nil
 		}
 	}
-	return
 }
 
 // HandlerConfNAK implements OwnOptionRule interface;
@@ -156,7 +155,6 @@ func (own *DefaultIPCPOwnRule) HandlerConfNAK(rcvd Options) {
 			own.SecondaryNBNS = o.(*IPv4AddrOption).Addr
 		}
 	}
-	return
 }
 
 // NewDefaultIPCPOwnRule returns a new DefaultIPCPOwnRule, with all address set to 0.0.0.0

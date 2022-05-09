@@ -86,6 +86,14 @@ func (ppp *PPP) Register(p PPPProtocolNumber) (send, recv chan []byte) {
 	return
 }
 
+// Un-register the protocol;
+func (ppp *PPP) UnRegister(p PPPProtocolNumber) {
+	ppp.relayChanListLock.Lock()
+	close(ppp.relayChanList[p])
+	delete(ppp.relayChanList, p)
+	ppp.relayChanListLock.Unlock()
+}
+
 // GetLogger return the logger
 func (ppp *PPP) GetLogger() *zap.Logger {
 	return ppp.logger

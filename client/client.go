@@ -16,6 +16,7 @@ import (
 	"github.com/hujun-open/zouppp/lcp"
 	"github.com/hujun-open/zouppp/pap"
 	"github.com/hujun-open/zouppp/pppoe"
+	"github.com/insomniacslk/dhcp/dhcpv6"
 
 	"github.com/hujun-open/etherconn"
 	"github.com/hujun-open/myaddr"
@@ -366,6 +367,20 @@ func (zou *ZouPPP) createDatapath(ctx context.Context) error {
 
 }
 
+// GetV6LLA returns the IPv6 LLA the compsoed of negotiated interface-id via IPv6CP
+func (zou *ZouPPP) GetV6LLA() (net.IP, error) {
+	if zou.ipv6cpProto != nil {
+		if ifidop := zou.ipv6cpProto.OwnRule.GetOption(uint8(lcp.IP6CPOpInterfaceIdentifier)); ifidop != nil {
+			ifid := [8]byte(*ifidop.(*lcp.InterfaceIDOption))
+			lla := make([]byte, 16)
+			copy(lla[:8], lcp.IPv6LinkLocalPrefix[:8])
+			copy(lla[8:16], ifid[:])
+			return lla, nil
+		}
+	}
+	return nil, fmt.Errorf("ipv6cp is not up")
+}
+
 func (zou *ZouPPP) ipcpEvtHandler(ctx context.Context, evt lcp.LayerNotifyEvent) {
 	zou.logger.Sugar().Infof("IPCP layer %v", evt)
 	switch evt {
@@ -388,6 +403,37 @@ func (zou *ZouPPP) ipcp6EvtHandler(ctx context.Context, evt lcp.LayerNotifyEvent
 	switch evt {
 	case lcp.LCPLayerNotifyUp:
 		defer zou.ncpWG.Done()
+		if zou.cfg.setup.DHCPv6 {
+			childctx, cancel := context.WithCancel(ctx)
+			econn := lcp.NewPPPConn(childctx, zou.pppProto, lcp.ProtoIPv6)
+			defer econn.Close()
+			defer cancel()
+			lla, _ := zou.GetV6LLA()
+			rudpconn, err := etherconn.NewSharingRUDPConn(fmt.Sprintf("[%v]:%v",
+				lla, dhcpv6.DefaultClientPort), econn,
+				[]etherconn.RUDPConnOption{etherconn.WithAcceptAny(true)})
+			if err != nil {
+				zou.logger.Sugar().Errorf("failed to create SharingRUDPConn %v", err)
+				return
+			}
+			clnt, err := NewDHCP6Clnt(rudpconn, &DHCP6Cfg{
+				Mac:    zou.cfg.Mac,
+				Debug:  zou.cfg.setup.LogLevel == LogLvlDebug,
+				NeedPD: true,
+				NeedNA: true,
+			}, lla)
+			if err != nil {
+				zou.logger.Sugar().Errorf("failed to create DHCPv6 client, %v", err)
+				return
+			}
+			err = clnt.Dial()
+			if err != nil {
+				zou.logger.Error(err.Error())
+				return
+			}
+
+		}
+
 		if zou.cfg.setup.Apply {
 			err := zou.createDatapath(ctx)
 			if err != nil {
@@ -479,6 +525,8 @@ type Setup struct {
 	IPv4 bool
 	// Run IPv6CP if true
 	IPv6 bool
+	// run DHCPv6 over PPP if true
+	DHCPv6 bool
 }
 
 // DefaultSetup returns a Setup with following defaults:
