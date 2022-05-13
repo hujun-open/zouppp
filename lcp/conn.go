@@ -11,33 +11,31 @@ import (
 	"github.com/hujun-open/etherconn"
 )
 
-type PPPAddr struct {
+// pppAddr implements net.Addr interface
+type pppAddr struct {
 	proto PPPProtocolNumber
 }
 
 // Network implenets net.Addr interface
-func (paddr PPPAddr) Network() string {
+func (paddr pppAddr) Network() string {
 	return "ppp"
 }
 
 // String implenets net.Addr interface, return "ppp:proto"
-func (paddr PPPAddr) String() string {
+func (paddr pppAddr) String() string {
 	return fmt.Sprintf("ppp:%v", paddr.proto)
 }
 
-type PPPPayloadRcvHandler func([]byte) ([]byte, int, error)
-type PPPPayloadSendHandler func([]byte, net.Addr) ([]byte, int, error)
-
 // PPPConn implements etherconn.SharedEconn interface, could be used to fwd network packets over PPP
 type PPPConn struct {
-	ppp                                 *PPP
-	send, recv                          chan []byte
-	localAddr                           PPPAddr
-	readDeadline, writeDeadline         time.Time
-	readDeadlineLock, writeDeadlineLock *sync.RWMutex
-	protoPrefix                         [2]byte
-	recvList                            *etherconn.ChanMap
-	perClntRecvChanDepth                uint
+	ppp                  *PPP
+	send, recv           chan []byte
+	localAddr            pppAddr
+	writeDeadline        time.Time
+	writeDeadlineLock    *sync.RWMutex
+	protoPrefix          [2]byte
+	recvList             *etherconn.ChanMap
+	perClntRecvChanDepth uint
 }
 
 const (
@@ -49,20 +47,14 @@ const (
 func NewPPPConn(ctx context.Context, ppp *PPP, proto PPPProtocolNumber) *PPPConn {
 	r := new(PPPConn)
 	r.ppp = ppp
-	r.localAddr = PPPAddr{proto: proto}
+	r.localAddr = pppAddr{proto: proto}
 	r.send, r.recv = ppp.Register(proto)
-	r.readDeadlineLock = new(sync.RWMutex)
 	r.writeDeadlineLock = new(sync.RWMutex)
 	r.recvList = etherconn.NewChanMap()
 	r.perClntRecvChanDepth = DefaultPerClntRecvChanDepth
 	binary.BigEndian.PutUint16(r.protoPrefix[:], uint16(proto))
 	go r.recvHandling(ctx)
 	return r
-}
-
-// LocalAddr implements net.PacketConn interface.
-func (pconn *PPPConn) LocalAddr() net.Addr {
-	return pconn.localAddr
 }
 
 //pkt is an IPv4 or IPv6 pkt
@@ -134,10 +126,12 @@ func (pconn *PPPConn) recvHandling(ctx context.Context) {
 	}
 }
 
+//Register implements etherconn.SharedEconn interface
 func (pconn *PPPConn) Register(k etherconn.L4RecvKey) (torecvch chan *etherconn.RelayReceival) {
 	return pconn.RegisterList([]etherconn.L4RecvKey{k})
 }
 
+//RegisterList register a list of keys
 func (pconn *PPPConn) RegisterList(keys []etherconn.L4RecvKey) (torecvch chan *etherconn.RelayReceival) {
 	ch := make(chan *etherconn.RelayReceival, pconn.perClntRecvChanDepth)
 	list := make([]interface{}, len(keys))
@@ -148,6 +142,7 @@ func (pconn *PPPConn) RegisterList(keys []etherconn.L4RecvKey) (torecvch chan *e
 	return ch
 }
 
+//WriteIPPktTo implements etherconn.SharedEconn interface, dstmac is not used
 func (pconn *PPPConn) WriteIPPktTo(p []byte, dstmac net.HardwareAddr) (int, error) {
 	pconn.writeDeadlineLock.RLock()
 	deadline := pconn.writeDeadline
@@ -180,32 +175,13 @@ func (pconn *PPPConn) WriteIPPktTo(p []byte, dstmac net.HardwareAddr) (int, erro
 	}
 }
 
-// Close implements net.PacketConn interface.
+// Close closes pconn
 func (pconn *PPPConn) Close() error {
 	pconn.ppp.UnRegister(pconn.localAddr.proto)
 	return nil
 }
 
-// SetDeadline implements net.PacketConn interface.
-func (pconn *PPPConn) SetDeadline(t time.Time) error {
-	pconn.writeDeadlineLock.Lock()
-	pconn.writeDeadline = t
-	pconn.writeDeadlineLock.Unlock()
-	pconn.readDeadlineLock.Lock()
-	pconn.readDeadline = t
-	pconn.readDeadlineLock.Unlock()
-	return nil
-}
-
-// SetReadDeadline implements net.PacketConn interface.
-func (pconn *PPPConn) SetReadDeadline(t time.Time) error {
-	pconn.readDeadlineLock.Lock()
-	pconn.readDeadline = t
-	pconn.readDeadlineLock.Unlock()
-	return nil
-}
-
-// SetWriteDeadline implements net.PacketConn interface.
+// SetWriteDeadline set deadline for WriteIPPktTo
 func (pconn *PPPConn) SetWriteDeadline(t time.Time) error {
 	pconn.writeDeadlineLock.Lock()
 	pconn.writeDeadline = t

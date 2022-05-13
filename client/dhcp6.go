@@ -12,12 +12,14 @@ import (
 	"github.com/insomniacslk/dhcp/iana"
 )
 
+// DHCP6Cfg hold configuration for DHCP6Clnt
 type DHCP6Cfg struct {
 	Mac            net.HardwareAddr
 	NeedPD, NeedNA bool
 	Debug          bool
 }
 
+// DHCP6Clnt is a DHCPv6 client
 type DHCP6Clnt struct {
 	clnt                              *nclient6.Client
 	cfg                               *DHCP6Cfg
@@ -27,7 +29,10 @@ type DHCP6Clnt struct {
 	assignedIAPDs                     []*net.IPNet
 }
 
-//mac address is used for client id only, not used for forwarding over PPP
+//NewDHCP6Clnt creates a new DHCPv6 client,
+//using conn as transport,
+//cfg holds the the configuration,
+//localLLA is used for local link local address for DHCPv6 msg
 func NewDHCP6Clnt(conn net.PacketConn, cfg *DHCP6Cfg, localLLA net.IP) (*DHCP6Clnt, error) {
 	mods := []nclient6.ClientOpt{}
 	if cfg.Debug {
@@ -96,6 +101,7 @@ func (dc *DHCP6Clnt) buildSolicit() (*dhcpv6.Message, error) {
 
 }
 
+// Dial completes a DHCPv6 exchange with server
 func (dc *DHCP6Clnt) Dial() error {
 	checkResp := func(msg *dhcpv6.Message, record bool) error {
 		if dc.cfg.NeedNA {
@@ -138,7 +144,7 @@ func (dc *DHCP6Clnt) Dial() error {
 	if err != nil {
 		return fmt.Errorf("got invalid advertise msg for clnt %v, %v", dc.cfg.Mac, err)
 	}
-	request, err := NewRequestFromAdv(adv)
+	request, err := newRequestFromAdv(adv)
 	if err != nil {
 		return fmt.Errorf("failed to build request msg for clnt %v, %v", dc.cfg.Mac, err)
 	}
@@ -154,7 +160,8 @@ func (dc *DHCP6Clnt) Dial() error {
 	}
 	return nil
 }
-func NewRequestFromAdv(adv *dhcpv6.Message, modifiers ...dhcpv6.Modifier) (*dhcpv6.Message, error) {
+
+func newRequestFromAdv(adv *dhcpv6.Message, modifiers ...dhcpv6.Modifier) (*dhcpv6.Message, error) {
 	if adv == nil {
 		return nil, fmt.Errorf("ADVERTISE cannot be nil")
 	}
@@ -185,10 +192,6 @@ func NewRequestFromAdv(adv *dhcpv6.Message, modifiers ...dhcpv6.Modifier) (*dhcp
 	if iana := adv.Options.OneIANA(); iana != nil {
 		req.AddOption(iana)
 	}
-	// if iana == nil {
-	// 	return nil, fmt.Errorf("IA_NA cannot be nil in ADVERTISE when building REQUEST")
-	// }
-	// req.AddOption(iana)
 	// add IA_PD
 	if iaPd := adv.GetOneOption(dhcpv6.OptionIAPD); iaPd != nil {
 		req.AddOption(iaPd)

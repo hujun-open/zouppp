@@ -736,9 +736,9 @@ func TestPPPoE(t *testing.T) {
 		// if c.desc != "no pppoesvr, should fail" {
 		// 	continue
 		// }
-		if i != 4 {
-			continue
-		}
+		// if i != 4 {
+		// 	continue
+		// }
 		c.zouconfig.setup.LogLevel = LogLvlDebug
 		time.Sleep(3 * time.Second)
 		t.Logf("-----> start case %d using rawrelay: %v", i, c.desc)
