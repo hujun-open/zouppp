@@ -52,6 +52,7 @@ func testCreateVethLink() error {
 	cmdList := []testCMD{
 		{cmd: fmt.Sprintf("ip netns del %v", svrNS), ignoreFail: true},
 		{cmd: fmt.Sprintf("ip link del %v", clntIF), ignoreFail: true},
+		{cmd: fmt.Sprintf("ip link del %v", svrIF), ignoreFail: true},
 		{cmd: fmt.Sprintf("ip netns add %v", svrNS)},
 		{cmd: fmt.Sprintf("ip link add %v type veth peer name %v", svrIF, clntIF)},
 		{cmd: fmt.Sprintf("ip link set %v netns %v", svrIF, svrNS)},
@@ -73,20 +74,49 @@ func testCreateVethLink() error {
 
 const dontRunTestSvr = "no server"
 
-func testRunSvr(ctx context.Context, cfg string) error {
+func testRunSvr(ctx context.Context, c testCase) error {
 	execCMD("pkill -9 pppoe-server")
 	execCMD("pkill -9 pppoe")
-	time.Sleep(time.Second)
+	execCMD("pkill -9 kea-dhcp6")
+	execCMD("pkill -9 kea")
+	execCMD("pkill tcpdump")
+	execCMD("ip link del testppp0")
+
+	time.Sleep(3 * time.Second)
+	var cmd string
+	const ipv6upscriptTemp = `#!/bin/sh
+
+	/usr/sbin/kea-dhcp6 -c %v`
+	const ip6cpUpScriptPath = "/etc/ppp/ipv6-up.d/kea"
+	if c.keaConf != "" {
+		os.Remove(ip6cpUpScriptPath)
+		dhconf, err := ioutil.TempFile("", "keav6conf*")
+		if err != nil {
+			return err
+		}
+		_, err = dhconf.Write([]byte(c.keaConf))
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(ip6cpUpScriptPath,
+			[]byte(fmt.Sprintf(ipv6upscriptTemp, dhconf.Name())),
+			0655)
+		if err != nil {
+			return err
+		}
+	}
+
 	tmpf, err := ioutil.TempFile("", "pppoesvroptions_*")
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(tmpf.Name(), []byte(cfg), 0644)
+	err = ioutil.WriteFile(tmpf.Name(), []byte(c.svrConfig), 0644)
 	if err != nil {
 		return err
 	}
 	tmpf.Close()
-	cmd := fmt.Sprintf("netns exec %v pppoe-server -q /usr/sbin/pppd -I %v -F -O %v", svrNS, svrIF, tmpf.Name())
+
+	cmd = fmt.Sprintf("netns exec %v pppoe-server -q /usr/sbin/pppd -I %v -F -O %v", svrNS, svrIF, tmpf.Name())
 	if err := exec.CommandContext(ctx, "ip", strings.Fields(cmd)...).Start(); err != nil {
 		return err
 	}
@@ -95,10 +125,12 @@ func testRunSvr(ctx context.Context, cfg string) error {
 }
 
 type testCase struct {
-	desc       string
-	zouconfig  *Config
-	svrConfig  string
-	shouldFail bool
+	desc        string
+	zouconfig   *Config
+	svrConfig   string
+	keaConf     string
+	keaSvrIPstr string
+	shouldFail  bool
 }
 
 // func testNewDefaultConfig() ClientConfig {
@@ -144,6 +176,7 @@ func TestPPPoE(t *testing.T) {
 					AuthProto: lcp.ProtoPAP,
 					IPv4:      true,
 					IPv6:      false,
+					Apply:     true,
 				},
 			},
 		},
@@ -172,7 +205,7 @@ func TestPPPoE(t *testing.T) {
 		},
 		//case 2
 		{
-			desc: "pap v6 only",
+			desc: "pap v6 only, with DHCPv6 IANA",
 			svrConfig: `
 			name mysystem
 			+pap
@@ -187,14 +220,55 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
-
-					Timeout:   3 * time.Second,
-					AuthProto: lcp.ProtoPAP,
-					IPv4:      false,
-					IPv6:      true,
+					Logger:     rootlog,
+					LogLevel:   LogLvlDebug,
+					Timeout:    3 * time.Second,
+					AuthProto:  lcp.ProtoPAP,
+					IPv4:       false,
+					IPv6:       true,
+					DHCPv6IANA: true,
+					Apply:      true,
 				},
 			},
+			keaConf: `{
+				# DHCPv6 configuration starts on the next line
+				"Dhcp6": {
+				
+				# First we set up global values
+					"valid-lifetime": 4000,
+					"renew-timer": 1000,
+					"rebind-timer": 2000,
+					"preferred-lifetime": 3000,
+				
+				# Next we set up the interfaces to be used by the server.
+					"interfaces-config": {
+						"interfaces": [ "ppp0" ]
+					},
+				
+				# And we specify the type of lease database
+					"lease-database": {
+						"type": "memfile",
+						"persist": true,
+						"name": "/var/lib/kea/dhcp6.leases"
+					},
+				
+				# Finally, we list the subnets from which we will be leasing addresses.
+					"subnet6": [
+						{
+							"subnet": "2001:db8:1::/64",
+							"pools": [
+								 {
+									 "pool": "2001:db8:1::2-2001:db8:1::ffff"
+								 }
+							 ],
+						"interface": "ppp0"
+						}
+					]
+				# DHCPv6 configuration ends with the next line
+				}
+				
+				}
+				`,
 		},
 		//case 3
 		{
@@ -224,7 +298,7 @@ func TestPPPoE(t *testing.T) {
 		},
 		//case 4
 		{
-			desc: "chap dualstack",
+			desc: "chap dualstack,with IAPD and IAPD",
 			svrConfig: `
 			name mysystem
 			-pap
@@ -240,12 +314,61 @@ func TestPPPoE(t *testing.T) {
 				setup: &Setup{
 					Logger: rootlog,
 
-					Timeout:   3 * time.Second,
-					AuthProto: lcp.ProtoCHAP,
-					IPv4:      true,
-					IPv6:      true,
+					Timeout:    3 * time.Second,
+					AuthProto:  lcp.ProtoCHAP,
+					IPv4:       true,
+					IPv6:       true,
+					DHCPv6IAPD: true,
+					DHCPv6IANA: true,
+					Apply:      true,
 				},
 			},
+			keaConf: `{
+				# DHCPv6 configuration starts on the next line
+				"Dhcp6": {
+				
+				# First we set up global values
+					"valid-lifetime": 4000,
+					"renew-timer": 1000,
+					"rebind-timer": 2000,
+					"preferred-lifetime": 3000,
+				
+				# Next we set up the interfaces to be used by the server.
+					"interfaces-config": {
+						"interfaces": [ "ppp0" ]
+					},
+				
+				# And we specify the type of lease database
+					"lease-database": {
+						"type": "memfile",
+						"persist": true,
+						"name": "/var/lib/kea/dhcp6.leases"
+					},
+				
+				# Finally, we list the subnets from which we will be leasing addresses.
+					"subnet6": [
+						{
+							"subnet": "2001:db8:1::/64",
+							"pools": [
+								 {
+									 "pool": "2001:db8:1::2-2001:db8:1::ffff"
+								 }
+							 ],
+							 "pd-pools": [
+                {
+                    "prefix": "3000:1::",
+                    "prefix-len": 64,
+                    "delegated-len": 96
+                }
+            ],
+						"interface": "ppp0"
+						}
+					]
+				# DHCPv6 configuration ends with the next line
+				}
+				
+				}
+				`,
 		},
 		//case 5
 		{
@@ -256,6 +379,51 @@ func TestPPPoE(t *testing.T) {
 			-chap
 			+ipv6
 			`,
+			keaConf: `
+			{
+				# DHCPv6 configuration starts on the next line
+				"Dhcp6": {
+				
+				# First we set up global values
+					"valid-lifetime": 4000,
+					"renew-timer": 1000,
+					"rebind-timer": 2000,
+					"preferred-lifetime": 3000,
+				
+				# Next we set up the interfaces to be used by the server.
+					"interfaces-config": {
+						"interfaces": [ "S" ]
+					},
+				
+				# And we specify the type of lease database
+					"lease-database": {
+						"type": "memfile",
+						"persist": true,
+						"name": "/var/lib/kea/dhcp6.leases"
+					},
+				
+				# Finally, we list the subnets from which we will be leasing addresses.
+					"subnet6": [
+						{
+							"subnet": "2001:db8:1::/64",
+							"pools": [
+								 {
+									 "pool": "2001:db8:1::2-2001:db8:1::ffff"
+								 }
+							 ],
+						  "pd-pools": [
+								{
+									"prefix": "3000:1::",
+									"prefix-len": 64,
+									"delegated-len": 96
+								}
+							],
+						"interface": "S"
+						}
+					]
+				}
+				}`,
+			keaSvrIPstr: "2001:dead::99/128",
 			zouconfig: &Config{
 				//Mac:       net.HardwareAddr{0xaa, 0xbb, 0xcc, 0x11, 0x22, 0x33},
 				Mac:       net.HardwareAddr{0xfa, 0x26, 0x67, 0x79, 0x18, 0x82},
@@ -494,7 +662,7 @@ func TestPPPoE(t *testing.T) {
 			)
 		} else {
 			relay, err = etherconn.NewXDPRelay(ctx, clntIF,
-				// etherconn.WithQueueID([]int{0}),
+				etherconn.WithQueueID([]int{0}),
 				etherconn.WithXDPDebug(true),
 				etherconn.WithXDPEtherTypes([]uint16{0x8863, 0x8864}),
 				etherconn.WithXDPDefaultReceival(false),
@@ -515,8 +683,9 @@ func TestPPPoE(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer econn.Close()
 		if c.svrConfig != dontRunTestSvr {
-			err = testRunSvr(ctx, c.svrConfig)
+			err = testRunSvr(ctx, c)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -530,6 +699,7 @@ func TestPPPoE(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		defer z.Close()
 		go execCMD("ip netns exec S tcpdump -n -i S -w s.pcap")
 		go z.Dial(ctx)
 		dialwg.Wait()
@@ -537,12 +707,25 @@ func TestPPPoE(t *testing.T) {
 		close(c.zouconfig.setup.StopResultCh)
 		// ch := make(chan int)
 		// <-ch
-
 		if summary.Success != 1 {
 			return fmt.Errorf("failed")
 		}
 		if z.fastpath == nil && z.cfg.setup.Apply {
 			return fmt.Errorf("datapath creation failed")
+		}
+		if z.cfg.setup.DHCPv6IANA {
+			if len(z.assignedIANAs) == 0 {
+				return fmt.Errorf("failed to get IANA")
+			} else {
+				t.Logf("assigned IANAs: %+v\n", z.assignedIANAs)
+			}
+		}
+		if z.cfg.setup.DHCPv6IAPD {
+			if len(z.assignedIAPDs) == 0 {
+				return fmt.Errorf("failed to get IANA")
+			} else {
+				t.Logf("assigned IAPDs: %+v\n", z.assignedIAPDs)
+			}
 		}
 		return nil
 	}
@@ -553,9 +736,11 @@ func TestPPPoE(t *testing.T) {
 		// if c.desc != "no pppoesvr, should fail" {
 		// 	continue
 		// }
-		// if i != 1 {
-		// 	continue
-		// }
+		if i != 4 {
+			continue
+		}
+		c.zouconfig.setup.LogLevel = LogLvlDebug
+		time.Sleep(3 * time.Second)
 		t.Logf("-----> start case %d using rawrelay: %v", i, c.desc)
 		err := testFunc(c, t, false)
 		if err != nil {
@@ -570,19 +755,19 @@ func TestPPPoE(t *testing.T) {
 			}
 		}
 		//using xdp
-		t.Logf("-----> start case %d using xdprelay: %v", i, c.desc)
-		err = testFunc(c, t, true)
-		if err != nil {
-			if c.shouldFail {
-				t.Logf("case %d: %v, failed as expected", i, c.desc)
-			} else {
-				t.Fatalf("case %d: %v failed, %v", i, c.desc, err)
-			}
-		} else {
-			if c.shouldFail {
-				t.Fatalf("case %d: %v should failed but succeed", i, c.desc)
-			}
-		}
+		// t.Logf("-----> start case %d using xdprelay: %v", i, c.desc)
+		// err = testFunc(c, t, true)
+		// if err != nil {
+		// 	if c.shouldFail {
+		// 		t.Logf("case %d: %v, failed as expected", i, c.desc)
+		// 	} else {
+		// 		t.Fatalf("case %d: %v failed, %v", i, c.desc, err)
+		// 	}
+		// } else {
+		// 	if c.shouldFail {
+		// 		t.Fatalf("case %d: %v should failed but succeed", i, c.desc)
+		// 	}
+		// }
 	}
 
 }

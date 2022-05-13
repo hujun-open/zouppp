@@ -2,10 +2,8 @@ module github.com/hujun-open/zouppp
 
 go 1.17
 
-replace github.com/hujun-open/etherconn => ../etherconn
-
 require (
-	github.com/hujun-open/etherconn v0.4.2
+	github.com/hujun-open/etherconn v0.4.3
 	github.com/hujun-open/myaddr v0.1.1
 	github.com/hujun-open/mywg v0.2.0
 	github.com/insomniacslk/dhcp v0.0.0-20220504074936-1ca156eafb9f

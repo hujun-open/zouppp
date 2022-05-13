@@ -32,7 +32,7 @@ const DefaultMaxFrameSize = 1500
 
 // NewTUNIf creates a new TUN interface the pppproto, using name as interface name, add ifv4addr to the TUN interface;
 // also creates an IPv6 link local address via v6ifid, set MTU to peermru;
-func NewTUNIf(ctx context.Context, pppproto *lcp.PPP, name string, ifv4addr net.IP, v6ifid []byte, peermru uint16) (*TUNIF, error) {
+func NewTUNIf(ctx context.Context, pppproto *lcp.PPP, name string, assignedAddrs []net.IP, v6ifid []byte, peermru uint16) (*TUNIF, error) {
 	var err error
 	r := new(TUNIF)
 	cfg := water.Config{
@@ -49,19 +49,42 @@ func NewTUNIf(ctx context.Context, pppproto *lcp.PPP, name string, ifv4addr net.
 		return nil, fmt.Errorf("failed to bring the TUN if %v up, %w", cfg.Name, err)
 	}
 	//add v4 addr
-	if !ifv4addr.IsUnspecified() && ifv4addr != nil {
-		r.ownV4Addr = ifv4addr
-		addrstr := fmt.Sprintf("%v/32", r.ownV4Addr)
-		v4addr, err := netlink.ParseAddr(addrstr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse %v as v4 addr, %w", addrstr, err)
+	for _, addr := range assignedAddrs {
+		if addr == nil {
+			continue
 		}
-		err = netlink.AddrAdd(r.nlink, v4addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add v4 addr %v, %w", addrstr, err)
+		if !addr.IsUnspecified() {
+			plen := "128"
+			if addr.To4() != nil {
+				r.ownV4Addr = addr
+				plen = "32"
+				r.sendChan, r.v4recvChan = pppproto.Register(lcp.ProtoIPv4)
+			}
+			addrstr := fmt.Sprintf("%v/%v", addr, plen)
+			naddr, err := netlink.ParseAddr(addrstr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse %v as IP addr, %w", addrstr, err)
+			}
+			err = netlink.AddrAdd(r.nlink, naddr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add addr %v, %w", addrstr, err)
+			}
 		}
-		r.sendChan, r.v4recvChan = pppproto.Register(lcp.ProtoIPv4)
 	}
+	// if !ifv4addr.IsUnspecified() && ifv4addr != nil {
+	// 	r.ownV4Addr = ifv4addr
+	// 	addrstr := fmt.Sprintf("%v/32", r.ownV4Addr)
+	// 	v4addr, err := netlink.ParseAddr(addrstr)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to parse %v as v4 addr, %w", addrstr, err)
+	// 	}
+	// 	err = netlink.AddrAdd(r.nlink, v4addr)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to add v4 addr %v, %w", addrstr, err)
+	// 	}
+
+	// 	r.sendChan, r.v4recvChan = pppproto.Register(lcp.ProtoIPv4)
+	// }
 	//add link local
 	if v6ifid != nil {
 		linklocaladdr := make([]byte, 16)
@@ -85,7 +108,7 @@ func NewTUNIf(ctx context.Context, pppproto *lcp.PPP, name string, ifv4addr net.
 	if mtu < 1280 {
 		mtu = 1280
 	}
-	err = netlink.LinkSetMTU(r.nlink, mtu)
+	netlink.LinkSetMTU(r.nlink, mtu)
 
 	r.maxFrameSize = DefaultMaxFrameSize
 	r.logger = pppproto.GetLogger().Named("datapath")

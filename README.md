@@ -10,6 +10,9 @@ zouppp is a set of GO modules implements PPPoE and related protocols:
  * zouppp/chap: CHAP RFC1994
  * zouppp/datapath: linux datapath
  * zouppp/client: PPPoE Client
+ * zouppp/client.DHCP6Clnt: DHCPv6 client
+
+**note: zouppp focus on client side, a PPPoE/PPP server requires addtional logic/code**
 
 ## PPPoE Client
 The main module implements a PPPoE test client with load testing capability. it could also be used as a starting point to implement your own PPPoE client;
@@ -21,6 +24,7 @@ It has following key features:
 - Option to not creating corresponding PPP TUN interface in OS, e.g. only do control plane processing, this is useful for protocol level only load testing.
 - Support BBF PPPoE tag: circuit-id/remote-id
 - IPv4, IPv6 and dual-stack
+- DHCPv6 over PPP,  IA_NA and/or IA_PD
  
 
 ### Example Client Usage
@@ -57,14 +61,20 @@ It has following key features:
 
 `zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -xdp`
 
+9. #1 variant, running DHCPv6 over ppp, requesing IA_NA and IA_PD
+`zouppp -i eth1 -u testuser -p passwd123 -l 1 -n 100 -dhcp6iana -dhcp6iapd`
+
 ### CLI
 
 ```
-flag provided but not defined: -?
 Usage of ./zouppp:
   -a    apply the network config, set false to skip creating the PPP TUN if
   -cid string
         pppoe BBF tag circuit-id
+  -dhcp6iana
+        request IANA via running dhcpv6 over ppp
+  -dhcp6iapd
+        request IAPD via running dhcpv6 over ppp
   -excludedvlans string
         excluded vlan IDs
   -i string

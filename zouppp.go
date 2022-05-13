@@ -64,7 +64,7 @@ func newSetupviaFlags(
 	uname, passwd string,
 	usepap bool,
 	v4, v6 bool,
-	dhcpv6 bool,
+	dhcpv6iana, dhcpv6iapd bool,
 	pppifname string,
 	Apply bool,
 	rootlog *zap.Logger,
@@ -158,7 +158,8 @@ func newSetupviaFlags(
 	}
 	r.IPv4 = v4
 	r.IPv6 = v6
-	r.DHCPv6 = dhcpv6
+	r.DHCPv6IANA = dhcpv6iana
+	r.DHCPv6IAPD = dhcpv6iapd
 	r.Apply = Apply
 	if !strings.Contains(pppifname, client.VarName) {
 		return nil, fmt.Errorf("ppp interface name must contain %v", client.VarName)
@@ -183,7 +184,8 @@ func main() {
 	rid := flag.String("rid", "", "pppoe BBF tag remote-id")
 	ipv4 := flag.Bool("v4", true, "enable Ipv4")
 	ipv6 := flag.Bool("v6", true, "enable Ipv6")
-	dhcp6 := flag.Bool("dhcp6", false, "run dhcpv6 over ppp")
+	dhcp6iana := flag.Bool("dhcp6iana", false, "request IANA via running dhcpv6 over ppp")
+	dhcp6iapd := flag.Bool("dhcp6iapd", false, "request IAPD via running dhcpv6 over ppp")
 	vlanid := flag.Int("vlan", -1, "vlan tag")
 	vlantype := flag.Uint("vlanetype", 0x8100, "vlan tag EtherType")
 	svlanid := flag.Int("svlan", -1, "svlan tag")
@@ -221,7 +223,7 @@ func main() {
 		*rid, *cid,
 		*uname, *passwd,
 		*usepap,
-		*ipv4, *ipv6, *dhcp6,
+		*ipv4, *ipv6, *dhcp6iana, *dhcp6iapd,
 		*pppifname,
 		*apply,
 		rootlog,

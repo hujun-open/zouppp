@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/hujun-open/zouppp/lcp"
 	"github.com/insomniacslk/dhcp/dhcpv6"
 	"github.com/insomniacslk/dhcp/dhcpv6/nclient6"
 	"github.com/insomniacslk/dhcp/iana"
@@ -24,6 +23,8 @@ type DHCP6Clnt struct {
 	cfg                               *DHCP6Cfg
 	locaddr                           net.IP
 	ipHeader, pseudoHeader, udpHeader []byte
+	assignedIANAs                     []net.IP
+	assignedIAPDs                     []*net.IPNet
 }
 
 //mac address is used for client id only, not used for forwarding over PPP
@@ -52,6 +53,8 @@ func NewDHCP6Clnt(conn net.PacketConn, cfg *DHCP6Cfg, localLLA net.IP) (*DHCP6Cl
 	r.pseudoHeader[39] = 17                         //next header
 	r.udpHeader = make([]byte, 8)
 	binary.BigEndian.PutUint16(r.udpHeader[:2], uint16(dhcpv6.DefaultClientPort)) //src port
+	r.assignedIANAs = []net.IP{}
+	r.assignedIAPDs = []*net.IPNet{}
 	return r, nil
 }
 func getIAIDviaTime(delta int64) (r [4]byte) {
@@ -93,29 +96,30 @@ func (dc *DHCP6Clnt) buildSolicit() (*dhcpv6.Message, error) {
 
 }
 
-func (dc *DHCP6Clnt) sendHandler(buf []byte, dst net.Addr) ([]byte, int, error) {
-	rbuf := dc.buildIPv6Pkt(buf, dst.(*net.UDPAddr))
-	return rbuf, len(rbuf), nil
-}
-
-func (dc *DHCP6Clnt) rcvHandler(buf []byte) ([]byte, int, error) {
-	//get UDP payload, no support for any IPv6 option
-	fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-	fmt.Println("recvd handler", buf)
-	return buf[48:], len(buf) - 48, nil
-}
-
 func (dc *DHCP6Clnt) Dial() error {
-	checkResp := func(msg *dhcpv6.Message) error {
+	checkResp := func(msg *dhcpv6.Message, record bool) error {
 		if dc.cfg.NeedNA {
 
 			if len(msg.Options.OneIANA().Options.Addresses()) == 0 {
 				return fmt.Errorf("no IANA address is assigned")
 			}
+			if record {
+				dc.assignedIANAs = []net.IP{}
+				for _, addr := range msg.Options.OneIANA().Options.Addresses() {
+					dc.assignedIANAs = append(dc.assignedIANAs, addr.IPv6Addr)
+				}
+			}
+
 		}
 		if dc.cfg.NeedPD {
 			if len(msg.Options.OneIAPD().Options.Prefixes()) == 0 {
 				return fmt.Errorf("no IAPD prefix is assigned")
+			}
+			if record {
+				dc.assignedIAPDs = []*net.IPNet{}
+				for _, p := range msg.Options.OneIAPD().Options.Prefixes() {
+					dc.assignedIAPDs = append(dc.assignedIAPDs, p.Prefix)
+				}
 			}
 		}
 		return nil
@@ -130,7 +134,7 @@ func (dc *DHCP6Clnt) Dial() error {
 	if err != nil {
 		return fmt.Errorf("failed recv DHCPv6 advertisement for %v, %v", dc.cfg.Mac, err)
 	}
-	err = checkResp(adv)
+	err = checkResp(adv, false)
 	if err != nil {
 		return fmt.Errorf("got invalid advertise msg for clnt %v, %v", dc.cfg.Mac, err)
 	}
@@ -144,7 +148,7 @@ func (dc *DHCP6Clnt) Dial() error {
 	if err != nil {
 		return fmt.Errorf("failed to recv DHCPv6 reply for %v, %v", dc.cfg.Mac, err)
 	}
-	err = checkResp(reply)
+	err = checkResp(reply, true)
 	if err != nil {
 		return fmt.Errorf("got invalid reply msg for %v, %v", dc.cfg.Mac, err)
 	}
@@ -204,74 +208,4 @@ func NewRequestFromAdv(adv *dhcpv6.Message, modifiers ...dhcpv6.Modifier) (*dhcp
 		mod(req)
 	}
 	return req, nil
-}
-
-func (dc *DHCP6Clnt) buildIPv6Pkt(p []byte, dst *net.UDPAddr) []byte {
-	src := net.UDPAddr{IP: dc.locaddr, Port: dhcpv6.DefaultClientPort}
-	var fullp []byte
-
-	//v6
-	fullp = append(make([]byte, 50), p...)
-	binary.BigEndian.PutUint16(fullp[:2], uint16(lcp.ProtoIPv6))
-	startIndex := 2
-	psuHeader := make([]byte, 40)
-	copy(psuHeader, dc.pseudoHeader)
-	copy(fullp[startIndex:startIndex+40], dc.ipHeader)
-	copy(fullp[startIndex+40:startIndex+48], dc.udpHeader)
-	//ip header
-	binary.BigEndian.PutUint16(fullp[startIndex+4:startIndex+6], uint16(8+len(p))) //payload length
-	copy(fullp[startIndex+8:startIndex+24], src.IP.To16()[:16])                    //src addr
-	copy(fullp[startIndex+24:startIndex+40], dst.IP.To16()[:16])                   //dst addr
-	//psudo header
-	copy(psuHeader[:16], src.IP.To16()[:16])                       //src addr
-	copy(psuHeader[16:32], dst.IP.To16()[:16])                     //dst addr
-	binary.BigEndian.PutUint32(psuHeader[32:36], uint32(8+len(p))) //udp len
-	//udp header
-	binary.BigEndian.PutUint16(fullp[startIndex+40:startIndex+42], uint16(src.Port))                                //src port
-	binary.BigEndian.PutUint16(fullp[startIndex+42:startIndex+44], uint16(dst.Port))                                //dst port
-	binary.BigEndian.PutUint16(fullp[startIndex+44:startIndex+46], uint16(8+len(p)))                                //udp len
-	binary.BigEndian.PutUint16(fullp[startIndex+46:startIndex+48], v6udpChecksum(fullp[startIndex+40:], psuHeader)) //udp checksum
-
-	return fullp
-
-}
-
-func v6udpChecksum(headerAndPayload, psudoHeader []byte) uint16 {
-	length := uint32(len(headerAndPayload))
-	csum := v6pseudoheaderChecksum(psudoHeader)
-	csum += uint32(17)
-	csum += length & 0xffff
-	csum += length >> 16
-	return tcpipChecksum(headerAndPayload, csum)
-}
-func v6pseudoheaderChecksum(pHeader []byte) (csum uint32) {
-	SrcIP := pHeader[:16]
-	DstIP := pHeader[16:32]
-	for i := 0; i < 16; i += 2 {
-		csum += uint32(SrcIP[i]) << 8
-		csum += uint32(SrcIP[i+1])
-		csum += uint32(DstIP[i]) << 8
-		csum += uint32(DstIP[i+1])
-	}
-	return csum
-}
-
-func tcpipChecksum(data []byte, csum uint32) uint16 {
-	// to handle odd lengths, we loop to length - 1, incrementing by 2, then
-	// handle the last byte specifically by checking against the original
-	// length.
-	length := len(data) - 1
-	for i := 0; i < length; i += 2 {
-		// For our test packet, doing this manually is about 25% faster
-		// (740 ns vs. 1000ns) than doing it by calling binary.BigEndian.Uint16.
-		csum += uint32(data[i]) << 8
-		csum += uint32(data[i+1])
-	}
-	if len(data)%2 == 1 {
-		csum += uint32(data[length]) << 8
-	}
-	for csum > 0xffff {
-		csum = (csum >> 16) + (csum & 0xffff)
-	}
-	return ^uint16(csum)
 }

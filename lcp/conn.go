@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"runtime"
 	"sync"
 	"time"
 
@@ -29,7 +28,7 @@ func (paddr PPPAddr) String() string {
 type PPPPayloadRcvHandler func([]byte) ([]byte, int, error)
 type PPPPayloadSendHandler func([]byte, net.Addr) ([]byte, int, error)
 
-// PPPConn implements net.PacketConn, could be used to fwd network packets over PPP
+// PPPConn implements etherconn.SharedEconn interface, could be used to fwd network packets over PPP
 type PPPConn struct {
 	ppp                                 *PPP
 	send, recv                          chan []byte
@@ -107,7 +106,7 @@ func (pconn *PPPConn) recvHandling(ctx context.Context) {
 	var buf []byte
 	var receival *etherconn.RelayReceival
 	var err error
-	runtime.LockOSThread()
+	// runtime.LockOSThread()
 	for {
 		select {
 		case <-ctx.Done():
