@@ -96,7 +96,7 @@ func NewZouPPP(econn *etherconn.EtherConn, cfg *Config,
 	options ...ZouPPPModifier) (zou *ZouPPP, err error) {
 	zou = new(ZouPPP)
 	zou.cfg = cfg
-	zou.logger = cfg.setup.Logger.Named(econn.LocalAddr().String())
+	zou.logger = cfg.setup.logger.Named(econn.LocalAddr().String())
 	taglist := []pppoe.Tag{pppoe.NewSvcTag("")}
 	if cfg.CID != "" || cfg.RID != "" {
 		taglist = append(taglist, pppoe.NewCircuitRemoteIDTag(cfg.CID, cfg.RID))
@@ -232,16 +232,16 @@ func (zou *ZouPPP) reportDialResult() {
 		if atomic.LoadUint32(zou.state) == StateOpen {
 			zou.result.R = ResultSuccess
 		}
-		if zou.cfg.setup.ResultCh != nil {
+		if zou.cfg.setup.resultCh != nil {
 			select {
-			case <-zou.cfg.setup.StopResultCh:
+			case <-zou.cfg.setup.stopResultCh:
 				return
 			default:
 			}
 			select {
-			case <-zou.cfg.setup.StopResultCh:
+			case <-zou.cfg.setup.stopResultCh:
 				return
-			case zou.cfg.setup.ResultCh <- zou.result:
+			case zou.cfg.setup.resultCh <- zou.result:
 			}
 		}
 	})
@@ -494,8 +494,8 @@ type DialResult struct {
 
 // Setup holds common configruation for creating one or mulitple ZouPPP sessions
 type Setup struct {
-	// Logger
-	Logger *zap.Logger
+	// logger
+	logger *zap.Logger
 	// Ifname is the binding intereface name
 	Ifname string
 	// NumOfClients is the number of clients to be created
@@ -520,10 +520,10 @@ type Setup struct {
 	Timeout time.Duration
 	// AuthProto is the authenticaiton protocol to use, e.g. lcp.ProtoCHAP
 	AuthProto lcp.PPPProtocolNumber
-	// each ZouPPP session will send dialing result to ResultCh
-	ResultCh chan *DialResult
-	// close StopResultCh as signal result collecting should stop
-	StopResultCh chan struct{}
+	// each ZouPPP session will send dialing result to resultCh
+	resultCh chan *DialResult
+	// close stopResultCh as signal result collecting should stop
+	stopResultCh chan struct{}
 	// RID is the BBF remote-id PPPoE tag
 	RID string
 	// CID is the BBF circuit-id PPPoE tag
@@ -540,39 +540,71 @@ type Setup struct {
 	IPv6 bool
 	// run DHCPv6 over PPP if true
 	DHCPv6IANA, DHCPv6IAPD bool
+	// enable profiling for dev
+	Profiling bool
+	// use XDP to forward packet
+	XDP bool
 }
+
+const resultChannelDepth = 128
 
 // DefaultSetup returns a Setup with following defaults:
 // - no vlan, use the mac of interface ifname
 // - no debug
 // - single client
 // - CHAP, IPv4 only
-func DefaultSetup(ifname, uname, upass string) (*Setup, error) {
-	var err error
+func DefaultSetup() *Setup {
 	r := new(Setup)
-	r.Logger, err = NewDefaultZouPPPLogger(LogLvlErr)
-	if err != nil {
-		return nil, err
-	}
-	if ifname == "" || uname == "" {
-		return nil, fmt.Errorf("ifname or username is empty")
-	}
-	iff, err := net.InterfaceByName(ifname)
-	if err != nil {
-		return nil, fmt.Errorf("can't find interface %v,%w", ifname, err)
-	}
+	r.resultCh = make(chan *DialResult, resultChannelDepth)
+	r.stopResultCh = make(chan struct{})
+	// r.logger, err = NewDefaultZouPPPLogger(LogLvlErr)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if ifname == "" || uname == "" {
+	// 	return nil, fmt.Errorf("ifname or username is empty")
+	// }
+	// iff, err := net.InterfaceByName(ifname)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("can't find interface %v,%w", ifname, err)
+	// }
 
-	r.Ifname = ifname
+	// r.Ifname = ifname
 	r.NumOfClients = 1
-	r.StartMAC = iff.HardwareAddr
+	// r.StartMAC = iff.HardwareAddr
 	r.Apply = true
 	r.AuthProto = lcp.ProtoCHAP
-	r.UserName = uname
-	r.Password = upass
+	// r.UserName = uname
+	// r.Password = upass
 	r.PPPIfName = genStrFunc(DefaultPPPIfNameTemplate, 0)
 	r.IPv4 = true
 	r.IPv6 = false
-	return r, nil
+	return r
+}
+
+func (setup *Setup) Init() error {
+	var err error
+	setup.logger, err = NewDefaultZouPPPLogger(setup.LogLevel)
+	if err != nil {
+		return err
+	}
+	if setup.Ifname == "" {
+		return fmt.Errorf("interface name can't be empty")
+	}
+	if setup.NumOfClients == 0 {
+		return fmt.Errorf("number of clients can't be zero")
+	}
+	iff, err := net.InterfaceByName(setup.Ifname)
+	if err != nil {
+		return fmt.Errorf("can't find interface %v,%w", setup.Ifname, err)
+	}
+	if len(setup.StartMAC) == 0 {
+		setup.StartMAC = iff.HardwareAddr
+	}
+	if !strings.Contains(setup.PPPIfName, VarName) {
+		return fmt.Errorf("ppp interface name must contain %v", VarName)
+	}
+	return nil
 }
 
 func (setup *Setup) excluded(vids []uint16) bool {
@@ -584,6 +616,14 @@ func (setup *Setup) excluded(vids []uint16) bool {
 		}
 	}
 	return false
+}
+
+func (setup *Setup) Close() {
+	close(setup.stopResultCh)
+}
+
+func (setup *Setup) Logger() *zap.Logger {
+	return setup.logger
 }
 
 // Config hold client specific configuration
@@ -749,9 +789,9 @@ func CollectResults(setup *Setup, resultch chan *ResultSummary) {
 L1:
 	for {
 		select {
-		case <-setup.StopResultCh:
+		case <-setup.stopResultCh:
 			break L1
-		case r := <-setup.ResultCh:
+		case r := <-setup.resultCh:
 			completeTime := r.DialFinishTime.Sub(r.StartTime)
 			if completeTime < 0 {
 				completeTime = 0
@@ -813,6 +853,33 @@ const (
 	// LogLvlDebug logs error + info + debug msg
 	LogLvlDebug
 )
+
+func (lvl LoggingLvl) MarshalText() (text []byte, err error) {
+	switch lvl {
+	case LogLvlErr:
+		return []byte("err"), nil
+	case LogLvlInfo:
+		return []byte("info"), nil
+	case LogLvlDebug:
+		return []byte("debug"), nil
+	}
+	return nil, fmt.Errorf("unknown logging lvl %d", lvl)
+}
+
+func (lvl *LoggingLvl) UnmarshalText(text []byte) error {
+	input := strings.TrimSpace(strings.ToLower(string(text)))
+	switch input {
+	case "err":
+		*lvl = LogLvlErr
+	case "info":
+		*lvl = LogLvlInfo
+	case "debug":
+		*lvl = LogLvlDebug
+	default:
+		return fmt.Errorf("unknown logging level, %s", string(text))
+	}
+	return nil
+}
 
 func logLvlToZapLvl(l LoggingLvl) zapcore.Level {
 	switch l {

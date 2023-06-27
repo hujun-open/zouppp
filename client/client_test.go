@@ -133,22 +133,22 @@ type testCase struct {
 	shouldFail  bool
 }
 
-// func testNewDefaultConfig() ClientConfig {
-// 	return ClientConfig{
-// 		Mac:       net.HardwareAddr{0xfa, 0x26, 0x67, 0x79, 0x18, 0x82},
-// 		UserName:  uName,
-// 		Password:  uPass,
-// 		PPPIfName: "testppp0",
-// 		setup: &Setup{
-// 			rootLogger: rootlog,
-// 			Timeout:    3 * time.Second,
-// 			AuthProto:  lcp.ProtoPAP,
-// 			IPv4:       true,
-// 			IPv6:       true,
-// 			Apply:      true,
-// 		},
-// 	}
-// }
+//	func testNewDefaultConfig() ClientConfig {
+//		return ClientConfig{
+//			Mac:       net.HardwareAddr{0xfa, 0x26, 0x67, 0x79, 0x18, 0x82},
+//			UserName:  uName,
+//			Password:  uPass,
+//			PPPIfName: "testppp0",
+//			setup: &Setup{
+//				rootLogger: rootlog,
+//				Timeout:    3 * time.Second,
+//				AuthProto:  lcp.ProtoPAP,
+//				IPv4:       true,
+//				IPv6:       true,
+//				Apply:      true,
+//			},
+//		}
+//	}
 func TestPPPoE(t *testing.T) {
 	rootlog, err := NewDefaultZouPPPLogger(LogLvlDebug)
 	if err != nil {
@@ -171,7 +171,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger:    rootlog,
+					logger:    rootlog,
 					Timeout:   10 * time.Second,
 					AuthProto: lcp.ProtoPAP,
 					IPv4:      true,
@@ -195,7 +195,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger:    rootlog,
+					logger:    rootlog,
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoCHAP,
 					IPv4:      true,
@@ -220,7 +220,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger:     rootlog,
+					logger:     rootlog,
 					LogLevel:   LogLvlDebug,
 					Timeout:    3 * time.Second,
 					AuthProto:  lcp.ProtoPAP,
@@ -242,7 +242,7 @@ func TestPPPoE(t *testing.T) {
 				
 				# Next we set up the interfaces to be used by the server.
 					"interfaces-config": {
-						"interfaces": [ "ppp0" ]
+						"interfaces": [ "testppp0" ]
 					},
 				
 				# And we specify the type of lease database
@@ -261,7 +261,7 @@ func TestPPPoE(t *testing.T) {
 									 "pool": "2001:db8:1::2-2001:db8:1::ffff"
 								 }
 							 ],
-						"interface": "ppp0"
+						"interface": "testppp0"
 						}
 					]
 				# DHCPv6 configuration ends with the next line
@@ -287,7 +287,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoCHAP,
@@ -312,7 +312,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:    3 * time.Second,
 					AuthProto:  lcp.ProtoCHAP,
@@ -431,7 +431,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoPAP,
@@ -455,7 +455,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  "wrong",
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoPAP,
@@ -480,7 +480,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  "wrong",
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoCHAP,
@@ -501,7 +501,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoPAP,
@@ -525,7 +525,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoPAP,
@@ -550,7 +550,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoPAP,
@@ -575,7 +575,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoCHAP,
@@ -601,7 +601,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger: rootlog,
+					logger: rootlog,
 
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoCHAP,
@@ -628,7 +628,7 @@ func TestPPPoE(t *testing.T) {
 				Password:  uPass,
 				PPPIfName: "testppp0",
 				setup: &Setup{
-					Logger:    rootlog,
+					logger:    rootlog,
 					Timeout:   3 * time.Second,
 					AuthProto: lcp.ProtoCHAP,
 					IPv4:      true,
@@ -642,8 +642,8 @@ func TestPPPoE(t *testing.T) {
 	testFunc := func(c testCase, t *testing.T, usingxdp bool) error {
 		resultch := make(chan *DialResult)
 		stopch := make(chan struct{})
-		c.zouconfig.setup.ResultCh = resultch
-		c.zouconfig.setup.StopResultCh = stopch
+		c.zouconfig.setup.resultCh = resultch
+		c.zouconfig.setup.stopResultCh = stopch
 		c.zouconfig.setup.NumOfClients = 1
 		summaryCh := make(chan *ResultSummary)
 		go CollectResults(c.zouconfig.setup, summaryCh)
@@ -704,7 +704,7 @@ func TestPPPoE(t *testing.T) {
 		go z.Dial(ctx)
 		dialwg.Wait()
 		summary := <-summaryCh
-		close(c.zouconfig.setup.StopResultCh)
+		close(c.zouconfig.setup.stopResultCh)
 		// ch := make(chan int)
 		// <-ch
 		if summary.Success != 1 {
