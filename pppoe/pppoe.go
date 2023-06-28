@@ -196,18 +196,19 @@ func (pppoe *PPPoE) ReadFrom(buf []byte) (int, net.Addr, error) {
 	if atomic.LoadUint32(pppoe.state) != pppoeStateOpen {
 		return 0, nil, fmt.Errorf("pppoe is not open")
 	}
-	var remotemac net.HardwareAddr
+	// var remotemac net.HardwareAddr
+	var l2ep *etherconn.L2Endpoint
 	var err error
 	var n int
 	for {
-		n, remotemac, err = pppoe.conn.ReadPktFrom(buf)
+		n, l2ep, err = pppoe.conn.ReadPktFrom(buf)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to recv, %w", err)
 		}
 		if n < 6 {
 			continue
 		}
-		if remotemac.String() != pppoe.acMAC.String() {
+		if l2ep.HwAddr.String() != pppoe.acMAC.String() {
 			continue
 		}
 		if Code(buf[1]) != CodeSession {
@@ -221,7 +222,7 @@ func (pppoe *PPPoE) ReadFrom(buf []byte) (int, net.Addr, error) {
 		break
 	}
 	//return int(binary.BigEndian.Uint16(buf[4:6])), etherconn.NewL2EndpointFromMACVLAN(remotemac, pppoe.vlans), nil
-	return n - 6, pppoe.newRemotePPPoEP(remotemac), nil
+	return n - 6, pppoe.newRemotePPPoEP(l2ep.HwAddr), nil
 }
 
 func (pppoe *PPPoE) newRemotePPPoEP(mac net.HardwareAddr) *Endpoint {
@@ -247,7 +248,7 @@ func (pppoe *PPPoE) getResponse(req *Pkt, code Code, dst net.HardwareAddr) (*Pkt
 		pppoe.logger.Sugar().Debugf("%v:\n%v", req.Code, req)
 		resp := new(Pkt)
 		pppoe.conn.SetReadDeadline(time.Now().Add(pppoe.timeout))
-		rcvpktbuf, remotemac, err := pppoe.conn.ReadPkt()
+		rcvpktbuf, l2ep, err := pppoe.conn.ReadPkt()
 		if err != nil {
 			if !errors.Is(err, etherconn.ErrTimeOut) {
 				return nil, nil, fmt.Errorf("failed to recv response, %w", err)
@@ -258,7 +259,7 @@ func (pppoe *PPPoE) getResponse(req *Pkt, code Code, dst net.HardwareAddr) (*Pkt
 			continue
 		}
 		if resp.Code == code {
-			return resp, remotemac, nil
+			return resp, l2ep.HwAddr, nil
 		}
 	}
 	return nil, nil, fmt.Errorf("faile to recv expect response %v", code)

@@ -144,7 +144,7 @@ func (p Pkt) String() string {
 	s := fmt.Sprintf("%v Code:%v\n", p.Proto, p.Code)
 	s += fmt.Sprintf("ID:%d\n", p.ID)
 	// s += fmt.Sprintf("Len:%d\n", lcp.Len)
-	s += fmt.Sprintf("Options:\n")
+	s += "Options:\n"
 	switch p.Code {
 	case CodeEchoReply, CodeEchoRequest, CodeDiscardRequest:
 		s += fmt.Sprintf("Magic Number:%x\n", p.MagicNum)
