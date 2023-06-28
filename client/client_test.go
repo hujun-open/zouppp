@@ -264,7 +264,7 @@ func TestPPPoE(t *testing.T) {
 									 "pool": "2001:db8:1::2-2001:db8:1::ffff"
 								 }
 							 ],
-						"interface": "testppp0"
+						"interface": "ppp0"
 						}
 					],
 				# DHCPv6 configuration ends with the next line
