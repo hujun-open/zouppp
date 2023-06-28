@@ -23,16 +23,16 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       # Runs a single command using the runners shell
 
 
 
       - name: setup up GO
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.20
+          go-version: '1.20'
       - name: install dep
         run: sudo apt-get -y install libpcap-dev ppp pppoe kea-dhcp6-server
       - name: download go dep
