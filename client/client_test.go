@@ -2,7 +2,7 @@ package client
 
 /*
 in order to run this test in ubuntu20.04, do following:
-  - apt-get install ppp pppoe
+  - apt-get install ppp pppoe kea-dhcp6 libpcap-dev
   - sudo rm -rf /etc/ppp/options
   - sudo cp ./testdata/pppsvrconf/* /etc/ppp/
 */
@@ -84,8 +84,10 @@ func testRunSvr(ctx context.Context, c testCase) error {
 
 	time.Sleep(3 * time.Second)
 	var cmd string
+	//NOTE: a specified LLA address is needed for ppp0, and also kea-dhcp6 server config need to include interface-config with the LLA,
+	// otherwise kea-dhcp6 server might pick peer LLA of ppp0 to listen, which leads to failed to receive any pkt
 	const ipv6upscriptTemp = `#!/bin/sh
-
+	ip addr replace fe80::899d:6441:87ba:c93f/64 dev ppp0
 	/usr/sbin/kea-dhcp6 -c %v`
 	const ip6cpUpScriptPath = "/etc/ppp/ipv6-up.d/kea"
 	if c.keaConf != "" {
@@ -133,22 +135,22 @@ type testCase struct {
 	shouldFail  bool
 }
 
-// func testNewDefaultConfig() ClientConfig {
-// 	return ClientConfig{
-// 		Mac:       net.HardwareAddr{0xfa, 0x26, 0x67, 0x79, 0x18, 0x82},
-// 		UserName:  uName,
-// 		Password:  uPass,
-// 		PPPIfName: "testppp0",
-// 		setup: &Setup{
-// 			rootLogger: rootlog,
-// 			Timeout:    3 * time.Second,
-// 			AuthProto:  lcp.ProtoPAP,
-// 			IPv4:       true,
-// 			IPv6:       true,
-// 			Apply:      true,
-// 		},
-// 	}
-// }
+//	func testNewDefaultConfig() ClientConfig {
+//		return ClientConfig{
+//			Mac:       net.HardwareAddr{0xfa, 0x26, 0x67, 0x79, 0x18, 0x82},
+//			UserName:  uName,
+//			Password:  uPass,
+//			PPPIfName: "testppp0",
+//			setup: &Setup{
+//				rootLogger: rootlog,
+//				Timeout:    3 * time.Second,
+//				AuthProto:  lcp.ProtoPAP,
+//				IPv4:       true,
+//				IPv6:       true,
+//				Apply:      true,
+//			},
+//		}
+//	}
 func TestPPPoE(t *testing.T) {
 	rootlog, err := NewDefaultZouPPPLogger(LogLvlDebug)
 	if err != nil {
@@ -242,7 +244,8 @@ func TestPPPoE(t *testing.T) {
 				
 				# Next we set up the interfaces to be used by the server.
 					"interfaces-config": {
-						"interfaces": [ "ppp0" ]
+						"interfaces": [ "ppp0/fe80::899d:6441:87ba:c93f" ],
+						"re-detect": false
 					},
 				
 				# And we specify the type of lease database
@@ -263,8 +266,24 @@ func TestPPPoE(t *testing.T) {
 							 ],
 						"interface": "ppp0"
 						}
-					]
+					],
 				# DHCPv6 configuration ends with the next line
+				"loggers": [
+        {
+            "name": "kea-dhcp6",
+            "output_options": [
+                {
+                    "output": "/var/log/kea-debug.log",
+                    "maxver": 8,
+                    "maxsize": 204800,
+                    "flush": true,
+                    "pattern": "%d{%j %H:%M:%S.%q} %c %m\n"
+                }
+            ],
+            "severity": "DEBUG",
+            "debuglevel": 99
+        }
+   ]
 				}
 				
 				}
@@ -335,7 +354,7 @@ func TestPPPoE(t *testing.T) {
 				
 				# Next we set up the interfaces to be used by the server.
 					"interfaces-config": {
-						"interfaces": [ "ppp0" ]
+						"interfaces": [ "ppp0/fe80::899d:6441:87ba:c93f" ]
 					},
 				
 				# And we specify the type of lease database
@@ -736,7 +755,7 @@ func TestPPPoE(t *testing.T) {
 		// if c.desc != "no pppoesvr, should fail" {
 		// 	continue
 		// }
-		// if i != 4 {
+		// if i != 5 {
 		// 	continue
 		// }
 		c.zouconfig.setup.LogLevel = LogLvlDebug
