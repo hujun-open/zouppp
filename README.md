@@ -111,6 +111,7 @@ Usage:
         default:false
 
 ```
-
+### Config File
+Thanks to [shouchan](github.com/hujun-open/shouchan), beside using CLI parameters, a YAML config file could also be used via "-f <conf_file>", the content of YAML is the client.Setup struct 
 
 
