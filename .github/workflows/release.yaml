@@ -30,3 +30,4 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
+        pre_command: "sudo apt-get -y install libpcap-dev"
