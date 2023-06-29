@@ -9,7 +9,6 @@ in order to run this test in ubuntu20.04, do following:
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -92,7 +91,7 @@ func testRunSvr(ctx context.Context, c testCase) error {
 	const ip6cpUpScriptPath = "/etc/ppp/ipv6-up.d/kea"
 	if c.keaConf != "" {
 		os.Remove(ip6cpUpScriptPath)
-		dhconf, err := ioutil.TempFile("", "keav6conf*")
+		dhconf, err := os.CreateTemp("", "keav6conf*")
 		if err != nil {
 			return err
 		}
@@ -100,7 +99,7 @@ func testRunSvr(ctx context.Context, c testCase) error {
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(ip6cpUpScriptPath,
+		err = os.WriteFile(ip6cpUpScriptPath,
 			[]byte(fmt.Sprintf(ipv6upscriptTemp, dhconf.Name())),
 			0655)
 		if err != nil {
@@ -108,11 +107,11 @@ func testRunSvr(ctx context.Context, c testCase) error {
 		}
 	}
 
-	tmpf, err := ioutil.TempFile("", "pppoesvroptions_*")
+	tmpf, err := os.CreateTemp("", "pppoesvroptions_*")
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(tmpf.Name(), []byte(c.svrConfig), 0644)
+	err = os.WriteFile(tmpf.Name(), []byte(c.svrConfig), 0644)
 	if err != nil {
 		return err
 	}

@@ -497,53 +497,54 @@ type Setup struct {
 	// logger
 	logger *zap.Logger
 	// Ifname is the binding intereface name
-	Ifname string
+	Ifname string `alias:"i" usage:"listening interface name"`
 	// NumOfClients is the number of clients to be created
-	NumOfClients uint
+	NumOfClients uint `alias:"n" usage:"number of PPPoE clients"`
 	// StartMAC is the starting mac address for all the sessions
-	StartMAC net.HardwareAddr
+	StartMAC net.HardwareAddr `alias:"mac" usage:"start MAC address"`
 	// MacStep is the mac address step to increase for each session
-	MacStep uint
+	MacStep uint `usage:"MAC step to increase for each client"`
 	// StartVLANs is the starting vlans for all the sessions
-	StartVLANs etherconn.VLANs
+	StartVLANs etherconn.VLANs `alias:"vlan" usage:"start VLAN id, could be Dot1q or QinQ"`
 	// VLANStep is the vlan step to increase for each session
-	VLANStep uint
+	VLANStep uint `usage:"VLAN step to increase for each client"`
 	// ExcludedVLANs is the slice of vlan id to skip, apply to all layer of vlans
-	ExcludedVLANs []uint16
+	ExcludedVLANs []uint16 `usage:"a list of excluded VLAN id, apply to all layer of vlans"`
 	// Interval is the amount of time to wait between launching each session
-	Interval time.Duration
-	LogLevel LoggingLvl
+	Interval time.Duration `usage:"amount of time to wait between launching each session"`
+	LogLevel LoggingLvl    `alias:"l" usage:"log levl, err|info|debug"`
 	// if Apply is true, then create a PPP interface with assigned addresses; could be set to false if only to test protocol
-	Apply bool
+	Apply bool `usage:"if Apply is true, then create a PPP interface with assigned addresses; could be set to false if only to test protocol"`
 	// number of Retries
-	Retry   uint
-	Timeout time.Duration
+	Retry   uint          `usage:"number of setup retry"`
+	Timeout time.Duration `usage:"setup timeout"`
 	// AuthProto is the authenticaiton protocol to use, e.g. lcp.ProtoCHAP
-	AuthProto lcp.PPPProtocolNumber
+	AuthProto lcp.PPPProtocolNumber `usage:"auth protocol, PAP or CHAP"`
 	// each ZouPPP session will send dialing result to resultCh
 	resultCh chan *DialResult
 	// close stopResultCh as signal result collecting should stop
 	stopResultCh chan struct{}
 	// RID is the BBF remote-id PPPoE tag
-	RID string
+	RID string `usage:"BBF remote-id"`
 	// CID is the BBF circuit-id PPPoE tag
-	CID string
+	CID string `usage:"BBF circuit-id"`
 	// UserName for PAP/CHAP auth
-	UserName string
+	UserName string `alias:"u" usage:"PAP/CHAP username"`
 	// Password for PAP/CHAP auth
-	Password string
+	Password string `alias:"p" usage:"PAP/CHAP password"`
 	// the name of PPP interface created after successfully dialing
-	PPPIfName string
+	PPPIfName string `usage:"name of PPP interface created after successfully dialing, must contain @ID"`
 	// Run IPCP if true
-	IPv4 bool
+	IPv4 bool `alias:"v4" usage:"run IPCP"`
 	// Run IPv6CP if true
-	IPv6 bool
+	IPv6 bool `alias:"v6" usage:"run IPv6CP"`
 	// run DHCPv6 over PPP if true
-	DHCPv6IANA, DHCPv6IAPD bool
+	DHCPv6IANA bool `usage:"run DHCPv6 over PPP to get an IANA address"`
+	DHCPv6IAPD bool `usage:"run DHCPv6 over PPP to get an IAPD prefix"`
 	// enable profiling for dev
-	Profiling bool
+	Profiling bool `usage:"enable profiling, dev use only"`
 	// use XDP to forward packet
-	XDP bool
+	XDP bool `usage:"use XDP to forward packet"`
 }
 
 const resultChannelDepth = 128
@@ -576,7 +577,7 @@ func DefaultSetup() *Setup {
 	r.AuthProto = lcp.ProtoCHAP
 	// r.UserName = uname
 	// r.Password = upass
-	r.PPPIfName = genStrFunc(DefaultPPPIfNameTemplate, 0)
+	r.PPPIfName = DefaultPPPIfNameTemplate
 	r.IPv4 = true
 	r.IPv6 = false
 	return r

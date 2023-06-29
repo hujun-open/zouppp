@@ -29,98 +29,87 @@ It has following key features:
 
 ### Example Client Usage
 
-1. on interface eth1, create 100 PPPoE session, CHAP, IPv4 only
+1. on interface eth1, create 100 PPPoE session, CHAP, IPv4 only, enable debug logging
 
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100`
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -v6=false -n 100`
 
 2. #1 variant, using PAP
 
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -pap`
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -v6=false -n 100 -authproto PAP`
 
-3. #1 variant, using vlan 100, svlan 200
+3. #1 variant, using QinQ 100.200
 
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -vlan 100 -svlan 200`
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -v6=false -n 100 -vlan 100.200`
 
 4. #3 variant, using custom mac 
 
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -vlan 100 -svlan 200 -mac "aa:bb:cc:11:22:33"`
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -v6=false -n 100 -vlan 100.200 -mac "aa:bb:cc:11:22:33"`
 
 5. #1 variant, don't create PPP TUN interface
 
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -a=false`
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -v6=false -n 100 -apply=false`
 
 6. #1 variant, each session use different username and password, e.g. first one username is "testuser-0", 2nd one is "testuser-1" ..etc; password following same rule
 
-`zouppp -i eth1 -u testuser-@ID -p passwd123-@ID -l 1 -v6=false -n 100`
+`zouppp -i eth1 -u testuser-@ID -p passwd123-@ID -l debug -v6=false -n 100`
 
 7. #1 variant, each session add BBF remote-id tag, first session remote-id tag is "remote-id-0", 2nd one is "remote-id-1" ..etc;
 
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -rid remote-id-@id`
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -v6=false -n 100 -rid remote-id-@id`
 
 8. #1 variant, use XDP socket;
 
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -v6=false -n 100 -xdp`
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -v6=false -n 100 -xdp`
 
-9. #1 variant, running DHCPv6 over ppp, requesing IA_NA and IA_PD
-`zouppp -i eth1 -u testuser -p passwd123 -l 1 -n 100 -dhcp6iana -dhcp6iapd`
+9. #1 variant, running DHCPv6 over ppp, requesting IA_NA and IA_PD
+`zouppp -i eth1 -u testuser -p passwd123 -l debug -n 100 -dhcp6iana -dhcp6iapd`
 
 ### CLI
 
 ```
-Usage of ./zouppp:
-  -a    apply the network config, set false to skip creating the PPP TUN if
-  -cid string
-        pppoe BBF tag circuit-id
-  -dhcp6iana
-        request IANA via running dhcpv6 over ppp
-  -dhcp6iapd
-        request IAPD via running dhcpv6 over ppp
-  -excludedvlans string
-        excluded vlan IDs
-  -i string
-        interface name
-  -interval duration
-        interval between launching client (default 1ms)
-  -l uint
-        log level: 0,1,2
-  -mac string
-        mac address
-  -macstep uint
-        mac address step (default 1)
-  -n uint
-        number of clients (default 1)
-  -p string
-        password
-  -pap
-        use PAP instead of CHAP
-  -pppif string
-        ppp interface name, must contain @ID (default "zouppp@ID")
-  -profiling
-        enable profiling, only for dev use
-  -retry uint
-        number of retry (default 3)
-  -rid string
-        pppoe BBF tag remote-id
-  -svlan int
-        svlan tag (default -1)
-  -svlanetype uint
-        svlan tag EtherType (default 33024)
-  -timeout duration
-        timeout (default 5s)
-  -u string
-        user name
-  -v4
-        enable Ipv4 (default true)
-  -v6
-        enable Ipv6 (default true)
-  -vlan int
-        vlan tag (default -1)
-  -vlanetype uint
-        vlan tag EtherType (default 33024)
-  -vlanstep uint
-        VLAN Id step
-  -xdp
-        use XDP
+Usage:
+  -f <filepath> : read from config file <filepath>
+  -apply <struct> : if Apply is true, then create a PPP interface with assigned addresses; could be set to false if only to test protocol
+        default:true
+  -authproto <struct> : auth protocol, PAP or CHAP
+        default:CHAP
+  -cid <struct> : BBF circuit-id
+  -dhcpv6iana <struct> : run DHCPv6 over PPP to get an IANA address
+        default:false
+  -dhcpv6iapd <struct> : run DHCPv6 over PPP to get an IAPD prefix
+        default:false
+  -excludedvlans <struct> : a list of excluded VLAN id, apply to all layer of vlans
+  -i <struct> : listening interface name
+  -interval <struct> : amount of time to wait between launching each session
+        default:0s
+  -l <struct> : log levl, err|info|debug
+        default:err
+  -mac <struct> : start MAC address
+  -macstep <struct> : MAC step to increase for each client
+        default:0
+  -n <struct> : number of PPPoE clients
+        default:1
+  -p <struct> : PAP/CHAP password
+  -pppifname <struct> : name of PPP interface created after successfully dialing, must contain @ID
+        default:zouppp@ID
+  -profiling <struct> : enable profiling, dev use only
+        default:false
+  -retry <struct> : number of setup retry
+        default:0
+  -rid <struct> : BBF remote-id
+  -timeout <struct> : setup timeout
+        default:0s
+  -u <struct> : PAP/CHAP username
+  -v4 <struct> : run IPCP
+        default:true
+  -v6 <struct> : run IPv6CP
+        default:false
+  -vlan <struct> : start VLAN id
+  -vlanstep <struct> : VLAN step to increase for each client
+        default:0
+  -xdp <struct> : use XDP to forward packet
+        default:false
+
 ```
 
 
