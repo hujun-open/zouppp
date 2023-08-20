@@ -68,50 +68,53 @@ It has following key features:
 
 ```
 Usage:
-  -f <filepath> : read from config file <filepath>
-  -apply <struct> : if Apply is true, then create a PPP interface with assigned addresses; could be set to false if only to test protocol
+a pppoe testing tool
+  - apply: if Apply is true, then create a PPP interface with assigned addresses; could be set to false if only to test protocol
         default:true
-  -authproto <struct> : auth protocol, PAP or CHAP
+  - authproto: auth protocol, PAP or CHAP
         default:CHAP
-  -cid <struct> : BBF circuit-id
-  -dhcpv6iana <struct> : run DHCPv6 over PPP to get an IANA address
+  - cid: BBF circuit-id
+  - dhcpv6iana: run DHCPv6 over PPP to get an IANA address
         default:false
-  -dhcpv6iapd <struct> : run DHCPv6 over PPP to get an IAPD prefix
+  - dhcpv6iapd: run DHCPv6 over PPP to get an IAPD prefix
         default:false
-  -excludedvlans <struct> : a list of excluded VLAN id, apply to all layer of vlans
-  -i <struct> : listening interface name
-  -interval <struct> : amount of time to wait between launching each session
+  - excludedvlans: a list of excluded VLAN id, apply to all layer of vlans
+  - i: listening interface name
+  - interval: amount of time to wait between launching each session
         default:0s
-  -l <struct> : log levl, err|info|debug
+  - l: log levl, err|info|debug
         default:err
-  -mac <struct> : start MAC address
-  -macstep <struct> : MAC step to increase for each client
+  - mac: start MAC address
+  - macstep: MAC step to increase for each client
         default:0
-  -n <struct> : number of PPPoE clients
+  - n: number of PPPoE clients
         default:1
-  -p <struct> : PAP/CHAP password
-  -pppifname <struct> : name of PPP interface created after successfully dialing, must contain @ID
+  - p: PAP/CHAP password
+  - pppifname: name of PPP interface created after successfully dialing, must contain @ID
         default:zouppp@ID
-  -profiling <struct> : enable profiling, dev use only
+  - profiling: enable profiling, dev use only
         default:false
-  -retry <struct> : number of setup retry
+  - retry: number of setup retry
         default:0
-  -rid <struct> : BBF remote-id
-  -timeout <struct> : setup timeout
+  - rid: BBF remote-id
+  - timeout: setup timeout
         default:0s
-  -u <struct> : PAP/CHAP username
-  -v4 <struct> : run IPCP
+  - u: PAP/CHAP username
+  - v4: run IPCP
         default:true
-  -v6 <struct> : run IPv6CP
+  - v6: run IPv6CP
         default:false
-  -vlan <struct> : start VLAN id
-  -vlanstep <struct> : VLAN step to increase for each client
+  - vlan: start VLAN id, could be Dot1q or QinQ
+  - vlanstep: VLAN step to increase for each client
         default:0
-  -xdp <struct> : use XDP to forward packet
+  - xdp: use XDP to forward packet
         default:false
+
+  -cfgfromfile: load configuration from the specified file
+        default:zouppp.conf
 
 ```
 ### Config File
-Thanks to [shouchan](https://github.com/hujun-open/shouchan), beside using CLI parameters, a YAML config file could also be used via "-f <conf_file>", the content of YAML is the client.Setup struct 
+Thanks to [shouchan](https://github.com/hujun-open/shouchan), beside using CLI parameters, a YAML config file could also be used via "-cfgfromfile <conf_file>", the content of YAML is the client.Setup struct 
 
 
