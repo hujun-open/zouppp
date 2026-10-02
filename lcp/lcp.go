@@ -26,6 +26,7 @@ type LCP struct {
 	restartTimer          *time.Timer
 	keepAliveTimer        *time.Timer
 	keepAliveInterval     time.Duration
+	echoMissed            *uint32 // brix 补丁: 连续 keepalive 超时计数 (对端静默判死)
 	cancellRestartTimer   context.CancelFunc
 	cancellkeepAliveTimer context.CancelFunc
 	sendChan              chan []byte
@@ -82,6 +83,8 @@ func NewLCP(ctx context.Context, proto PPPProtocolNumber, pppProto *PPP, h Layer
 	lcp.OwnRule = NewDefaultOwnOptionRule()
 	lcp.restartTimerDuration = DefaultRestartTimerDuration
 	lcp.keepAliveInterval = DefaultKeepAliveInterval
+	lcp.echoMissed = new(uint32)
+	atomic.StoreUint32(lcp.echoMissed, 0)
 	lcp.PeerRule, _ = NewDefaultPeerOptionRule(DefaultAuthProto)
 	lcp.requestIDChan = make(chan uint8)
 	lcp.reqiestIDLock = new(sync.RWMutex)
@@ -383,12 +386,23 @@ func (lcp *LCP) resetKeepAliveTimer(ctx context.Context) {
 	var childctx context.Context
 	childctx, lcp.cancellkeepAliveTimer = context.WithCancel(ctx)
 	go func(c context.Context) {
-		select {
-		case <-lcp.keepAliveTimer.C:
-			lcp.keepAliveTimeout(ctx)
-		case <-c.Done():
+		for {
+			select {
+			case <-lcp.keepAliveTimer.C:
+				lcp.keepAliveTimeout(c)
+				// brix 补丁: 原实现仅单次触发, EchoReqSent 态无后续定时器 -> 对端静默永不判死;
+				// 循环武装使 keepalive 以 keepAliveInterval 周期持续探测
+				st := State(atomic.LoadUint32(lcp.state))
+				if st != StateOpened && st != StateEchoReqSent {
+					return
+				}
+				lcp.keepAliveTimer.Reset(lcp.keepAliveInterval)
+			case <-c.Done():
+				return
+			}
 		}
 	}(childctx)
+
 }
 
 func (lcp *LCP) resetTimer(ctx context.Context) {
@@ -421,13 +435,33 @@ func (lcp *LCP) keepAliveTimeout(ctx context.Context) {
 			return
 		}
 		lcp.setState(StateEchoReqSent)
+	case StateEchoReqSent:
+		// brix 补丁: 连续 3 个周期无 EchoReply 判定对端静默, 主动 Down 触发会话拆除与重拨
+		missed := atomic.AddUint32(lcp.echoMissed, 1)
+		if missed >= 3 {
+			lcp.logger.Sugar().Errorf("keepalive timeout x%d, tearing down session", missed)
+			lcp.Down(ctx)
+			return
+		}
+		if err := lcp.sendEchoRequest(ctx); err != nil {
+			lcp.logger.Error(err.Error())
+		}
 	}
-
 }
 
 // Timeout event, called by lcp.resetTimer()
 func (lcp *LCP) timeout(ctx context.Context) {
 	defer atomic.AddUint32(lcp.restartCount, ^uint32(0))
+	// brix 补丁: EchoReqSent 态的每次超时 = 对端未应答一次;
+	// 原实现对端静默只记日志不拆链, 静默掉线永不重拨。连续 3 次即主动 Down。
+	if atomic.LoadUint32(lcp.state) == uint32(StateEchoReqSent) {
+		missed := atomic.AddUint32(lcp.echoMissed, 1)
+		if missed >= 3 {
+			lcp.logger.Sugar().Errorf("keepalive timeout x%d, tearing down session", missed)
+			lcp.Down(ctx)
+			return
+		}
+	}
 	if atomic.LoadUint32(lcp.restartCount) == 0 {
 		if atomic.LoadUint32(lcp.state) == uint32(StateEchoReqSent) {
 			lcp.logger.Error("keepalive timeout")
@@ -900,6 +934,7 @@ func (lcp *LCP) rxr(ctx context.Context, req *Pkt) error {
 	case CodeEchoReply:
 		switch lcp.getState() {
 		case StateEchoReqSent:
+			atomic.StoreUint32(lcp.echoMissed, 0) // brix 补丁: 收到应答清零静默计数
 			atomic.StoreUint32(lcp.restartCount, lcp.maxRestart)
 			lcp.setState(StateOpened)
 			lcp.resetKeepAliveTimer(ctx)
