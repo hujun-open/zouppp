@@ -78,7 +78,7 @@ func (dc *DHCP6Clnt) buildSolicit() (*dhcpv6.Message, error) {
 		optModList = append(optModList, dhcpv6.WithIAPD(getIAIDviaTime(1)))
 	}
 	duid := dhcpv6.Duid{
-		Type:          dhcpv6.DUID_LL,
+		Type:          dhcpv6.DUID_LLT,
 		HwType:        iana.HWTypeEthernet,
 		Time:          dhcpv6.GetTime(),
 		LinkLayerAddr: dc.cfg.Mac,
