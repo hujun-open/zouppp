@@ -497,9 +497,9 @@ type Setup struct {
 	// logger
 	logger *zap.Logger
 	// Ifname is the binding intereface name
-	Ifname string `alias:"i" usage:"listening interface name"`
+	Ifname string `short:"i" usage:"listening interface name"`
 	// NumOfClients is the number of clients to be created
-	NumOfClients uint `alias:"n" usage:"number of PPPoE clients"`
+	NumOfClients uint `short:"n" usage:"number of PPPoE clients"`
 	// StartMAC is the starting mac address for all the sessions
 	StartMAC net.HardwareAddr `alias:"mac" usage:"start MAC address"`
 	// MacStep is the mac address step to increase for each session
@@ -512,7 +512,7 @@ type Setup struct {
 	ExcludedVLANs []uint16 `usage:"a list of excluded VLAN id, apply to all layer of vlans"`
 	// Interval is the amount of time to wait between launching each session
 	Interval time.Duration `usage:"amount of time to wait between launching each session"`
-	LogLevel LoggingLvl    `alias:"l" usage:"log levl, err|info|debug"`
+	LogLevel LoggingLvl    `short:"l" usage:"log levl, err|info|debug"`
 	// if Apply is true, then create a PPP interface with assigned addresses; could be set to false if only to test protocol
 	Apply bool `usage:"if Apply is true, then create a PPP interface with assigned addresses; could be set to false if only to test protocol"`
 	// number of Retries
@@ -529,9 +529,9 @@ type Setup struct {
 	// CID is the BBF circuit-id PPPoE tag
 	CID string `usage:"BBF circuit-id"`
 	// UserName for PAP/CHAP auth
-	UserName string `alias:"u" usage:"PAP/CHAP username"`
+	UserName string `short:"u" usage:"PAP/CHAP username"`
 	// Password for PAP/CHAP auth
-	Password string `alias:"p" usage:"PAP/CHAP password"`
+	Password string `short:"p" usage:"PAP/CHAP password"`
 	// the name of PPP interface created after successfully dialing
 	PPPIfName string `usage:"name of PPP interface created after successfully dialing, must contain @ID"`
 	// Run IPCP if true

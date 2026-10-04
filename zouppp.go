@@ -32,14 +32,16 @@ import (
 	"time"
 
 	"github.com/hujun-open/etherconn"
-	"github.com/hujun-open/shouchan"
+	_ "github.com/hujun-open/myflags/v2/types"
+	"github.com/hujun-open/shouchan/v2"
+	_ "github.com/hujun-open/shouchantypes/v2"
 	"github.com/hujun-open/zouppp/client"
 	"github.com/hujun-open/zouppp/pppoe"
 )
 
 func main() {
 	setup := client.DefaultSetup()
-	cnf, err := shouchan.NewSConf(setup, "zouppp", "a pppoe testing tool", shouchan.WithDefaultConfigFilePath[*client.Setup]("zouppp.conf"))
+	cnf, err := shouchan.NewSConf(setup, "zouppp", "a pppoe testing tool", shouchan.WithDefaultConfigFilePath[client.Setup]("zouppp.conf"))
 	if err != nil {
 		log.Fatalf("failed to create configuration, %v", err)
 	}
