@@ -37,6 +37,8 @@ jobs:
         run: sudo apt-get -y install libpcap-dev ppp pppoe kea-dhcp6-server
       - name: download go dep
         run: go get -t -v ./...
+      - name: creating folders
+        run: mkdir -p /etc/ppp/ipv6-up.d /var/log /var/lib/kea /run/kea
       - name: remove stock pppd options file
         run: sudo rm -rf /etc/ppp/options
       - name: copy test pppd files
